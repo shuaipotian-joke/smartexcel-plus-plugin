@@ -1,5 +1,32 @@
-const SMARTEXCEL_URL = 'https://smarterexcel.com';
+const SMARTEXCEL_URL = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : 'https://smarterexcel.com';
 const PLUGIN_PAYMENT_URL = `${SMARTEXCEL_URL}/plugin-payment?closeAfterPayment=true`;
+
+function getPluginAuthUrl(planId?: string) {
+  const callbackUrl = new URL(`${SMARTEXCEL_URL}/dashboard`);
+  callbackUrl.searchParams.set('source', 'plugin');
+  callbackUrl.searchParams.set('intent', 'buy-credits');
+
+  if (planId) {
+    callbackUrl.searchParams.set('planId', planId);
+  }
+
+  const authUrl = new URL(SMARTEXCEL_URL);
+  authUrl.searchParams.set('auth', 'register');
+  authUrl.searchParams.set('source', 'plugin');
+  authUrl.searchParams.set('intent', 'buy-credits');
+  authUrl.searchParams.set(
+    'callbackUrl',
+    `${callbackUrl.pathname}${callbackUrl.search}`
+  );
+
+  if (planId) {
+    authUrl.searchParams.set('planId', planId);
+  }
+
+  return authUrl.toString();
+}
 
 // ─── Credit helpers ────────────────────────────────────────────────────────
 
@@ -77,10 +104,17 @@ export default defineBackground(() => {
 
     if (message.type === 'OPEN_PAYMENT_PAGE') {
       const planId = message.payload?.planId;
-      const url = planId
-        ? `${PLUGIN_PAYMENT_URL}&planId=${planId}`
-        : PLUGIN_PAYMENT_URL;
-      browser.tabs.create({ url });
+
+      getStoredCredits().then(({ loggedIn }) => {
+        const url = loggedIn
+          ? planId
+            ? `${PLUGIN_PAYMENT_URL}&planId=${planId}`
+            : PLUGIN_PAYMENT_URL
+          : getPluginAuthUrl(planId);
+
+        browser.tabs.create({ url });
+      });
+
       return false;
     }
 
