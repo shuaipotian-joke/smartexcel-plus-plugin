@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { TableInfo } from '@/utils/messaging';
+import { useExtensionStore } from '@/utils/store';
+import { t, type Lang } from '@/utils/i18n';
+import SettingsPanel from './SettingsPanel';
 
 type CreditState = {
   credits: number;
@@ -12,11 +15,17 @@ export default function App() {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [creditState, setCreditState] = useState<CreditState | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const lang = useExtensionStore((s) => s.lang);
+  const setLang = useExtensionStore((s) => s.setLang);
+  const initLang = useExtensionStore((s) => s.initLang);
 
   useEffect(() => {
+    initLang();
     loadTables();
     loadCreditState();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadTables() {
     try {
@@ -52,15 +61,25 @@ export default function App() {
     browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
   }, []);
 
-  // Format remaining display
   const getRemainingText = () => {
     if (!creditState) return '';
     if (creditState.loggedIn) {
-      return `剩余 ${creditState.credits} 次`;
+      return t('creditsRemaining', lang, { n: creditState.credits });
     }
     const remaining = creditState.freeLimit - creditState.freeUsed;
-    return `免费剩余 ${remaining} 次`;
+    return t('freeCreditsRemaining', lang, { n: remaining });
   };
+
+  if (showSettings) {
+    return (
+      <SettingsPanel
+        lang={lang}
+        onLangChange={setLang}
+        onBack={() => setShowSettings(false)}
+        creditState={creditState}
+      />
+    );
+  }
 
   return (
     <div className="w-[360px] min-h-[200px] bg-white">
@@ -76,8 +95,19 @@ export default function App() {
         </div>
         <div className="flex-1">
           <h1 className="text-white font-semibold text-sm">SmartExcel</h1>
-          <p className="text-white/70 text-xs">网页表格智能导出</p>
+          <p className="text-white/70 text-xs">{t('appSubtitle', lang)}</p>
         </div>
+        {/* Settings button */}
+        <button
+          onClick={() => setShowSettings(true)}
+          className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors"
+          title={t('settings', lang)}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
       </div>
 
       {/* Credit info bar */}
@@ -90,7 +120,7 @@ export default function App() {
             className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full hover:bg-brand-700 transition-colors font-medium"
             onClick={handleAddCredits}
           >
-            添加次数
+            {t('addCredits', lang)}
           </button>
         </div>
       )}
@@ -104,26 +134,26 @@ export default function App() {
         ) : tables.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-4xl mb-3">📊</div>
-            <p className="text-gray-500 text-sm">当前页面未检测到表格</p>
-            <p className="text-gray-400 text-xs mt-1">鼠标悬停在表格上即可显示导出按钮</p>
+            <p className="text-gray-500 text-sm">{t('noTablesFound', lang)}</p>
+            <p className="text-gray-400 text-xs mt-1">{t('hoverHint', lang)}</p>
           </div>
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-600">
-                检测到 <strong className="text-brand-600">{tables.length}</strong> 个表格
+                {t('tablesDetected', lang, { n: tables.length })}
               </span>
               {tables.length > 1 && (
                 <button
                   className="text-xs bg-brand-50 text-brand-600 px-3 py-1 rounded-full hover:bg-brand-100 transition-colors font-medium"
                   onClick={handleExportAll}
                 >
-                  全部导出
+                  {t('exportAll', lang)}
                 </button>
               )}
             </div>
             {tables.map((table) => (
-              <TableCard key={table.id} table={table} />
+              <TableCard key={table.id} table={table} lang={lang} />
             ))}
           </div>
         )}
@@ -135,14 +165,14 @@ export default function App() {
           className="text-xs text-gray-400 hover:text-brand-600 transition-colors"
           onClick={() => browser.runtime.sendMessage({ type: 'OPEN_WEBSITE' })}
         >
-          打开 SmartExcel 网站 →
+          {t('openWebsite', lang)}
         </button>
       </div>
     </div>
   );
 }
 
-function TableCard({ table }: { table: TableInfo }) {
+function TableCard({ table, lang }: { table: TableInfo; lang: Lang }) {
   const handleExport = useCallback(
     async (format: 'xlsx' | 'csv') => {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -185,13 +215,13 @@ function TableCard({ table }: { table: TableInfo }) {
           onClick={() => handleExport('xlsx')}
           className="flex-1 text-xs bg-brand-600 text-white py-1.5 rounded-lg hover:bg-brand-700 transition-colors font-medium"
         >
-          导出 Excel
+          {t('exportExcel', lang)}
         </button>
         <button
           onClick={() => handleExport('csv')}
           className="text-xs border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          CSV
+          {t('csvLabel', lang)}
         </button>
       </div>
     </div>

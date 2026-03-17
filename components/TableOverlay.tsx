@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { parseTable, type ParsedTable } from '@/utils/table-parser';
 import { exportToExcel, copyTableToClipboard } from '@/utils/excel-export';
 import { useExtensionStore } from '@/utils/store';
+import { t, type Lang } from '@/utils/i18n';
 
 type CreditCheckResult = {
   allowed: boolean;
@@ -32,6 +33,7 @@ interface FloatingButton {
 
 export default function TableOverlay() {
   const isEnabled = useExtensionStore((s) => s.isEnabled);
+  const lang = useExtensionStore((s) => s.lang);
   const [fab, setFab] = useState<FloatingButton>({
     visible: false,
     x: 0,
@@ -47,6 +49,18 @@ export default function TableOverlay() {
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2000);
+  }, []);
+
+  // Load saved lang preference and watch for changes made in the popup
+  useEffect(() => {
+    useExtensionStore.getState().initLang();
+    const handler = (changes: Record<string, { newValue?: unknown }>) => {
+      if (changes.se_lang?.newValue) {
+        useExtensionStore.setState({ lang: changes.se_lang.newValue as Lang });
+      }
+    };
+    browser.storage.onChanged.addListener(handler);
+    return () => browser.storage.onChanged.removeListener(handler);
   }, []);
 
   useEffect(() => {
@@ -119,26 +133,28 @@ export default function TableOverlay() {
       const result = await requestCheckAndConsume();
 
       if (!result.allowed) {
-        // 无积分，打开支付页面
         openPaymentPage();
         return;
       }
 
       try {
         exportToExcel(fab.table, { format, withIndex });
+        const fmt = format.toUpperCase();
         if (result.isLoggedIn) {
-          const hint = result.remaining !== undefined ? `，剩余 ${result.remaining} 积分` : '';
-          showToast(`已导出为 ${format.toUpperCase()}${hint}`);
+          const hint = result.remaining !== undefined
+            ? t('creditsLeft', lang, { n: result.remaining })
+            : '';
+          showToast(t('exportedAs', lang, { fmt }) + hint);
         } else {
           const hint = result.remaining !== undefined && result.remaining > 0
-            ? `，剩余 ${result.remaining} 次免费`
+            ? t('freeLeft', lang, { n: result.remaining })
             : result.remaining === 0
-              ? '，免费次数已用完'
+              ? t('freeUsedUp', lang)
               : '';
-          showToast(`已导出为 ${format.toUpperCase()}${hint}`);
+          showToast(t('exportedAs', lang, { fmt }) + hint);
         }
       } catch {
-        showToast('导出失败，请重试');
+        showToast(t('exportFailed', lang));
       }
     },
     [fab.table, withIndex, showToast],
@@ -158,11 +174,11 @@ export default function TableOverlay() {
     try {
       await copyTableToClipboard(fab.table, withIndex);
       const hint = result.isLoggedIn
-        ? (result.remaining !== undefined ? `，剩余 ${result.remaining} 积分` : '')
-        : (result.remaining !== undefined && result.remaining > 0 ? `，剩余 ${result.remaining} 次免费` : '');
-      showToast(`已复制到剪贴板${hint}`);
+        ? (result.remaining !== undefined ? t('creditsLeft', lang, { n: result.remaining }) : '')
+        : (result.remaining !== undefined && result.remaining > 0 ? t('freeLeft', lang, { n: result.remaining }) : '');
+      showToast(t('copiedToClipboard', lang) + hint);
     } catch {
-      showToast('复制失败，请重试');
+      showToast(t('copyFailed', lang));
     }
   }, [fab.table, withIndex, showToast]);
 
@@ -220,7 +236,7 @@ export default function TableOverlay() {
             e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.boxShadow = '0 2px 12px rgba(26,115,245,0.4)';
           }}
-          title="SmartExcel - 导出表格"
+          title={t('exportTableTitle', lang)}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
@@ -253,7 +269,7 @@ export default function TableOverlay() {
               padding: '10px 14px', backgroundColor: '#f9fafb',
               borderBottom: '1px solid #e5e7eb', fontSize: '12px', color: '#6b7280',
             }}>
-              📋 {fab.table?.rowCount} 行 × {fab.table?.colCount} 列
+              📋 {fab.table ? t('rowsCols', lang, { r: fab.table.rowCount, c: fab.table.colCount }) : ''}
             </div>
 
             {/* Index toggle — auto-shown when CSS row numbers detected */}
@@ -265,7 +281,7 @@ export default function TableOverlay() {
               }}
             >
               <span style={{ fontSize: '12px', color: '#374151' }}>
-                {fab.table?.hasCssRowNumbers ? '🔢 检测到序号列' : '🔢 添加序号列'}
+                {fab.table?.hasCssRowNumbers ? t('hasRowNumbers', lang) : t('addRowNumbers', lang)}
               </span>
               <label style={{
                 position: 'relative', display: 'inline-block',
@@ -292,11 +308,11 @@ export default function TableOverlay() {
               </label>
             </div>
 
-            <MenuItem icon="📊" label="导出为 Excel" sublabel=".xlsx" onClick={() => handleExport('xlsx')} />
-            <MenuItem icon="📄" label="导出为 CSV" sublabel=".csv" onClick={() => handleExport('csv')} />
-            <MenuItem icon="📋" label="复制到剪贴板" onClick={handleCopy} />
+            <MenuItem icon="📊" label={t('exportAsExcel', lang)} sublabel=".xlsx" onClick={() => handleExport('xlsx')} />
+            <MenuItem icon="📄" label={t('exportAsCsv', lang)} sublabel=".csv" onClick={() => handleExport('csv')} />
+            <MenuItem icon="📋" label={t('copyToClipboard', lang)} onClick={handleCopy} />
             <div style={{ height: '1px', backgroundColor: '#f3f4f6', margin: '0 10px' }} />
-            <MenuItem icon="🚀" label="发送到 SmartExcel" sublabel="AI 处理" onClick={handleSendToWeb} />
+            <MenuItem icon="🚀" label={t('sendToSmartExcel', lang)} sublabel={t('aiProcess', lang)} onClick={handleSendToWeb} />
           </div>
         )}
       </div>
