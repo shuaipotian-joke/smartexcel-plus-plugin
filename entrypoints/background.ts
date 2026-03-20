@@ -367,6 +367,19 @@ export default defineBackground(() => {
       return true;
     }
 
+    if (message.type === 'OPEN_REGISTER') {
+      browser.tabs
+        .create({
+          url: buildBridgeUrl({ authMode: 'register' }),
+        })
+        .then(() => sendResponse({ ok: true }))
+        .catch((error) => {
+          console.error('open register bridge failed:', error);
+          sendResponse({ ok: false });
+        });
+      return true;
+    }
+
     if (message.type === 'OPEN_PAYMENT_PAGE') {
       const planId = message.payload?.planId;
       openWebsiteWithPluginLogin(

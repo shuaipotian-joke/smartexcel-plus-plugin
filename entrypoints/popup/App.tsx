@@ -67,6 +67,10 @@ export default function App() {
     await browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
   }, []);
 
+  const handleRegister = useCallback(async () => {
+    await browser.runtime.sendMessage({ type: 'OPEN_REGISTER' });
+  }, []);
+
   const handleLogout = useCallback(async () => {
     await browser.runtime.sendMessage({ type: 'LOGOUT_PLUGIN' });
     await loadCreditState();
@@ -89,6 +93,7 @@ export default function App() {
         onBack={() => setShowSettings(false)}
         creditState={creditState}
         onLogin={handleLogin}
+        onRegister={handleRegister}
         onLogout={handleLogout}
       />
     );

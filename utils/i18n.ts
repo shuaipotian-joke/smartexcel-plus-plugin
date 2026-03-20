@@ -43,6 +43,7 @@ const zh = {
   times: '次',
   notLoggedIn: '未登录',
   loginForMore: '登录获取更多次数',
+  createAccount: '注册新账号',
   loggedInAs: '当前账号：{email}',
   logout: '退出登录',
 
@@ -98,6 +99,7 @@ const en: Record<TranslationKey, string> = {
   times: 'times',
   notLoggedIn: 'Not logged in',
   loginForMore: 'Login for more exports',
+  createAccount: 'Create account',
   loggedInAs: 'Signed in as: {email}',
   logout: 'Log out',
 

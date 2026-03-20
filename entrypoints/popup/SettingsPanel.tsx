@@ -15,6 +15,7 @@ interface SettingsPanelProps {
   onBack: () => void;
   creditState: CreditState | null;
   onLogin: () => void;
+  onRegister: () => void;
   onLogout: () => void;
 }
 
@@ -24,6 +25,7 @@ export default function SettingsPanel({
   onBack,
   creditState,
   onLogin,
+  onRegister,
   onLogout,
 }: SettingsPanelProps) {
   return (
@@ -113,13 +115,21 @@ export default function SettingsPanel({
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">{t('notLoggedIn', lang)}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">{t('notLoggedIn', lang)}</span>
+                      <button
+                        onClick={onLogin}
+                        className="text-xs text-brand-600 hover:underline"
+                      >
+                        {t('loginForMore', lang)}
+                      </button>
+                    </div>
                     <button
-                      onClick={onLogin}
-                      className="text-xs text-brand-600 hover:underline"
+                      onClick={onRegister}
+                      className="text-xs text-gray-500 hover:text-brand-600 hover:underline"
                     >
-                      {t('loginForMore', lang)}
+                      {t('createAccount', lang)}
                     </button>
                   </div>
                 )}
