@@ -9,6 +9,8 @@ type CreditState = {
   loggedIn: boolean;
   freeUsed: number;
   freeLimit: number;
+  email?: string;
+  name?: string;
 };
 
 export default function App() {
@@ -61,6 +63,15 @@ export default function App() {
     browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
   }, []);
 
+  const handleLogin = useCallback(async () => {
+    await browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    await browser.runtime.sendMessage({ type: 'LOGOUT_PLUGIN' });
+    await loadCreditState();
+  }, []);
+
   const getRemainingText = () => {
     if (!creditState) return '';
     if (creditState.loggedIn) {
@@ -77,6 +88,8 @@ export default function App() {
         onLangChange={setLang}
         onBack={() => setShowSettings(false)}
         creditState={creditState}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
       />
     );
   }

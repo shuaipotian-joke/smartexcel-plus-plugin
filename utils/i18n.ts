@@ -43,6 +43,8 @@ const zh = {
   times: '次',
   notLoggedIn: '未登录',
   loginForMore: '登录获取更多次数',
+  loggedInAs: '当前账号：{email}',
+  logout: '退出登录',
 
   // TableOverlay — button / menu labels
   exportTableTitle: 'SmartExcel - 导出表格',
@@ -96,6 +98,8 @@ const en: Record<TranslationKey, string> = {
   times: 'times',
   notLoggedIn: 'Not logged in',
   loginForMore: 'Login for more exports',
+  loggedInAs: 'Signed in as: {email}',
+  logout: 'Log out',
 
   exportTableTitle: 'SmartExcel - Export Table',
   rowsCols: '{r} rows × {c} cols',

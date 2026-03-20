@@ -5,6 +5,8 @@ interface CreditState {
   loggedIn: boolean;
   freeUsed: number;
   freeLimit: number;
+  email?: string;
+  name?: string;
 }
 
 interface SettingsPanelProps {
@@ -12,6 +14,8 @@ interface SettingsPanelProps {
   onLangChange: (lang: Lang) => void;
   onBack: () => void;
   creditState: CreditState | null;
+  onLogin: () => void;
+  onLogout: () => void;
 }
 
 export default function SettingsPanel({
@@ -19,6 +23,8 @@ export default function SettingsPanel({
   onLangChange,
   onBack,
   creditState,
+  onLogin,
+  onLogout,
 }: SettingsPanelProps) {
   return (
     <div className="w-[360px] min-h-[200px] bg-white">
@@ -85,19 +91,32 @@ export default function SettingsPanel({
                 </div>
 
                 {creditState.loggedIn ? (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">{t('creditsBalance', lang)}</span>
-                    <span className="text-sm font-medium text-brand-600">
-                      {creditState.credits} {t('times', lang)}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">{t('creditsBalance', lang)}</span>
+                      <span className="text-sm font-medium text-brand-600">
+                        {creditState.credits} {t('times', lang)}
+                      </span>
+                    </div>
+                    <div className="space-y-2 pt-1">
+                      <div className="text-xs text-gray-400">
+                        {t('loggedInAs', lang, {
+                          email: creditState.email || creditState.name || '—',
+                        })}
+                      </div>
+                      <button
+                        onClick={onLogout}
+                        className="text-xs text-red-500 hover:underline"
+                      >
+                        {t('logout', lang)}
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-400">{t('notLoggedIn', lang)}</span>
                     <button
-                      onClick={() =>
-                        browser.runtime.sendMessage({ type: 'OPEN_WEBSITE' })
-                      }
+                      onClick={onLogin}
                       className="text-xs text-brand-600 hover:underline"
                     >
                       {t('loginForMore', lang)}
