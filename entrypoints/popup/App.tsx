@@ -81,8 +81,7 @@ export default function App() {
     if (creditState.loggedIn) {
       return t('creditsRemaining', lang, { n: creditState.credits });
     }
-    const remaining = creditState.freeLimit - creditState.freeUsed;
-    return t('freeCreditsRemaining', lang, { n: remaining });
+    return t('signupBonusHint', lang, { n: creditState.freeLimit });
   };
 
   if (showSettings) {
@@ -136,9 +135,9 @@ export default function App() {
           </span>
           <button
             className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full hover:bg-brand-700 transition-colors font-medium"
-            onClick={handleAddCredits}
+            onClick={creditState.loggedIn ? handleAddCredits : handleLogin}
           >
-            {t('addCredits', lang)}
+            {creditState.loggedIn ? t('addCredits', lang) : t('login', lang)}
           </button>
         </div>
       )}

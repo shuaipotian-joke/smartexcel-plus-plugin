@@ -16,8 +16,9 @@ const zh = {
 
   // Credit bar
   creditsRemaining: '剩余 {n} 次',
-  freeCreditsRemaining: '免费剩余 {n} 次',
   addCredits: '添加次数',
+  login: '登录',
+  signupBonusHint: '登录后可用，新用户赠送 {n} 次导出',
 
   // No tables state
   noTablesFound: '当前页面未检测到表格',
@@ -37,13 +38,11 @@ const zh = {
   // Settings panel
   language: '语言',
   usageStats: '使用统计',
-  freeUsed: '免费已用',
-  freeQuota: '免费次数',
   creditsBalance: '积分余额',
   times: '次',
   notLoggedIn: '未登录',
-  loginForMore: '登录获取更多次数',
   createAccount: '注册新账号',
+  createAccountForBonus: '注册领取 {n} 次导出',
   loggedInAs: '当前账号：{email}',
   logout: '退出登录',
 
@@ -61,8 +60,7 @@ const zh = {
   // TableOverlay — toast messages
   exportedAs: '已导出为 {fmt}',
   creditsLeft: '，剩余 {n} 积分',
-  freeLeft: '，剩余 {n} 次免费',
-  freeUsedUp: '，免费次数已用完',
+  loginRequiredToExport: '导出前请先登录，新用户赠送 5 次',
   exportFailed: '导出失败，请重试',
   copiedToClipboard: '已复制到剪贴板',
   copyFailed: '复制失败，请重试',
@@ -77,8 +75,9 @@ const en: Record<TranslationKey, string> = {
   back: 'Back',
 
   creditsRemaining: '{n} credits left',
-  freeCreditsRemaining: '{n} free exports left',
   addCredits: 'Add Credits',
+  login: 'Login',
+  signupBonusHint: 'Sign in to export. New users get {n} free exports',
 
   noTablesFound: 'No tables found on this page',
   hoverHint: 'Hover over a table to show the export button',
@@ -93,13 +92,11 @@ const en: Record<TranslationKey, string> = {
 
   language: 'Language',
   usageStats: 'Usage Stats',
-  freeUsed: 'Free Used',
-  freeQuota: 'Free Quota',
   creditsBalance: 'Credits',
   times: 'times',
   notLoggedIn: 'Not logged in',
-  loginForMore: 'Login for more exports',
   createAccount: 'Create account',
+  createAccountForBonus: 'Create account and get {n} exports',
   loggedInAs: 'Signed in as: {email}',
   logout: 'Log out',
 
@@ -115,8 +112,7 @@ const en: Record<TranslationKey, string> = {
 
   exportedAs: 'Exported as {fmt}',
   creditsLeft: ', {n} credits left',
-  freeLeft: ', {n} free exports left',
-  freeUsedUp: ', free quota used up',
+  loginRequiredToExport: 'Please sign in before exporting. New users get 5 free exports',
   exportFailed: 'Export failed, please retry',
   copiedToClipboard: 'Copied to clipboard',
   copyFailed: 'Copy failed, please retry',

@@ -84,14 +84,6 @@ export default function SettingsPanel({
           <div className="bg-gray-50 rounded-xl p-3 space-y-2.5">
             {creditState ? (
               <>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">{t('freeUsed', lang)}</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {creditState.freeUsed} / {creditState.freeLimit}{' '}
-                    {t('times', lang)}
-                  </span>
-                </div>
-
                 {creditState.loggedIn ? (
                   <>
                     <div className="flex items-center justify-between">
@@ -117,19 +109,22 @@ export default function SettingsPanel({
                 ) : (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">{t('notLoggedIn', lang)}</span>
+                      <span className="text-sm text-gray-400">{t('loginRequiredToExport', lang)}</span>
                       <button
                         onClick={onLogin}
                         className="text-xs text-brand-600 hover:underline"
                       >
-                        {t('loginForMore', lang)}
+                        {t('login', lang)}
                       </button>
                     </div>
+                    <p className="text-xs text-gray-500">
+                      {t('signupBonusHint', lang, { n: creditState.freeLimit })}
+                    </p>
                     <button
                       onClick={onRegister}
                       className="text-xs text-gray-500 hover:text-brand-600 hover:underline"
                     >
-                      {t('createAccount', lang)}
+                      {t('createAccountForBonus', lang, { n: creditState.freeLimit })}
                     </button>
                   </div>
                 )}

@@ -20,6 +20,10 @@ async function requestCheckAndConsume(): Promise<CreditCheckResult> {
   }
 }
 
+function openLoginPage() {
+  browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
+}
+
 function openPaymentPage() {
   browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
 }
@@ -133,6 +137,12 @@ export default function TableOverlay() {
       const result = await requestCheckAndConsume();
 
       if (!result.allowed) {
+        if (result.reason === 'not_logged_in') {
+          showToast(t('loginRequiredToExport', lang));
+          openLoginPage();
+          return;
+        }
+
         openPaymentPage();
         return;
       }
@@ -140,19 +150,10 @@ export default function TableOverlay() {
       try {
         exportToExcel(fab.table, { format, withIndex });
         const fmt = format.toUpperCase();
-        if (result.isLoggedIn) {
-          const hint = result.remaining !== undefined
-            ? t('creditsLeft', lang, { n: result.remaining })
-            : '';
-          showToast(t('exportedAs', lang, { fmt }) + hint);
-        } else {
-          const hint = result.remaining !== undefined && result.remaining > 0
-            ? t('freeLeft', lang, { n: result.remaining })
-            : result.remaining === 0
-              ? t('freeUsedUp', lang)
-              : '';
-          showToast(t('exportedAs', lang, { fmt }) + hint);
-        }
+        const hint = result.remaining !== undefined
+          ? t('creditsLeft', lang, { n: result.remaining })
+          : '';
+        showToast(t('exportedAs', lang, { fmt }) + hint);
       } catch {
         showToast(t('exportFailed', lang));
       }
@@ -167,15 +168,21 @@ export default function TableOverlay() {
     const result = await requestCheckAndConsume();
 
     if (!result.allowed) {
+      if (result.reason === 'not_logged_in') {
+        showToast(t('loginRequiredToExport', lang));
+        openLoginPage();
+        return;
+      }
+
       openPaymentPage();
       return;
     }
 
     try {
       await copyTableToClipboard(fab.table, withIndex);
-      const hint = result.isLoggedIn
-        ? (result.remaining !== undefined ? t('creditsLeft', lang, { n: result.remaining }) : '')
-        : (result.remaining !== undefined && result.remaining > 0 ? t('freeLeft', lang, { n: result.remaining }) : '');
+      const hint = result.remaining !== undefined
+        ? t('creditsLeft', lang, { n: result.remaining })
+        : '';
       showToast(t('copiedToClipboard', lang) + hint);
     } catch {
       showToast(t('copyFailed', lang));

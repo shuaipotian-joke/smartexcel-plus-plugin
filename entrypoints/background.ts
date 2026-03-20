@@ -1,6 +1,5 @@
-const SMARTEXCEL_URL = import.meta.env.DEV
-  ? 'http://localhost:3000'
-  : 'https://smarterexcel.com';
+const SMARTEXCEL_URL =
+  import.meta.env.WXT_SMARTEXCEL_URL || 'http://localhost:3000';
 const PLUGIN_BRIDGE_URL = `${SMARTEXCEL_URL}/plugin-auth/bridge`;
 const PLUGIN_ME_URL = `${SMARTEXCEL_URL}/api/plugin/auth/me`;
 const PLUGIN_CONSUME_URL = `${SMARTEXCEL_URL}/api/plugin/consume`;
@@ -121,7 +120,7 @@ async function refreshPluginState() {
   if (!stored.token) {
     return {
       loggedIn: false,
-      credits: stored.credits,
+      credits: 0,
       email: '',
       name: '',
       userId: '',
@@ -252,13 +251,6 @@ async function revokePluginToken(token: string) {
   }
 }
 
-// ─── Credit helpers ────────────────────────────────────────────────────────
-
-async function getFreeUsed(): Promise<number> {
-  const result = await browser.storage.local.get('se_free_used');
-  return (result.se_free_used as number) || 0;
-}
-
 /**
  * Check if user can export and consume one credit.
  */
@@ -270,44 +262,38 @@ async function checkAndConsume(): Promise<{
 }> {
   const stored = await getStoredPluginSession();
 
-  if (stored.token) {
-    try {
-      const result = await consumeLoggedInCredit(stored.token);
-      if (result?.success) {
-        await browser.storage.local.set({
-          se_logged_in: true,
-          se_credits: result.remaining ?? 0,
-        });
-        return {
-          allowed: true,
-          remaining: result.remaining ?? 0,
-          isLoggedIn: true,
-        };
-      }
+  if (!stored.token) {
+    return { allowed: false, reason: 'not_logged_in', isLoggedIn: false };
+  }
 
-      if (result == null) {
-        // token invalid, fall through to guest flow
-      } else {
-        return {
-          allowed: false,
-          reason: result.error === 'insufficient_credits' ? 'no_credits' : 'internal_error',
-          isLoggedIn: true,
-        };
-      }
-    } catch (error) {
-      console.error('logged-in consume failed:', error);
-      return { allowed: false, reason: 'internal_error', isLoggedIn: true };
+  try {
+    const result = await consumeLoggedInCredit(stored.token);
+    if (result?.success) {
+      await browser.storage.local.set({
+        se_logged_in: true,
+        se_credits: result.remaining ?? 0,
+      });
+      return {
+        allowed: true,
+        remaining: result.remaining ?? 0,
+        isLoggedIn: true,
+      };
     }
-  }
 
-  // Not logged in: use 3-free local limit
-  const freeUsed = await getFreeUsed();
-  const FREE_LIMIT = 3;
-  if (freeUsed < FREE_LIMIT) {
-    await browser.storage.local.set({ se_free_used: freeUsed + 1 });
-    return { allowed: true, remaining: FREE_LIMIT - freeUsed - 1, isLoggedIn: false };
+    if (result == null) {
+      return { allowed: false, reason: 'not_logged_in', isLoggedIn: false };
+    }
+
+    return {
+      allowed: false,
+      reason:
+        result.error === 'insufficient_credits' ? 'no_credits' : 'internal_error',
+      isLoggedIn: true,
+    };
+  } catch (error) {
+    console.error('logged-in consume failed:', error);
+    return { allowed: false, reason: 'internal_error', isLoggedIn: true };
   }
-  return { allowed: false, reason: 'free_limit_reached', isLoggedIn: false };
 }
 
 async function syncCredits(data: {
@@ -333,6 +319,25 @@ async function syncPluginAuth(data: {
   name?: string;
 }): Promise<void> {
   await storePluginSession(data);
+
+  try {
+    const me = await fetchPluginMe(data.token);
+    if (!me?.loggedIn) {
+      await clearPluginSession();
+      return;
+    }
+
+    await browser.storage.local.set({
+      se_logged_in: true,
+      se_credits: me.credits ?? data.credits ?? 0,
+      se_email: me.email ?? data.email ?? '',
+      se_name: me.name ?? data.name ?? '',
+      se_user_id: me.userId ?? data.userId,
+      se_plugin_token_expires_at: me.tokenExpiresAt ?? data.expiresAt,
+    });
+  } catch (error) {
+    console.error('plugin auth sync refresh failed:', error);
+  }
 }
 
 // ─── Main background entry ─────────────────────────────────────────────────
@@ -434,8 +439,7 @@ export default defineBackground(() => {
     // Get current credit state (for popup display)
     if (message.type === 'GET_STATE') {
       refreshPluginState().then(async (state) => {
-        const freeUsed = await getFreeUsed();
-        sendResponse({ ...state, freeUsed, freeLimit: 3 });
+        sendResponse({ ...state, freeUsed: 0, freeLimit: 5 });
       });
       return true;
     }
