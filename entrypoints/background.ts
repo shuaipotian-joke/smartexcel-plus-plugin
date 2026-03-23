@@ -10,8 +10,15 @@ function buildBridgeUrl(options?: {
   authMode?: 'login' | 'register';
   planId?: string;
   redirectTo?: string;
+  action?: 'logout';
 }) {
   const bridgeUrl = new URL(PLUGIN_BRIDGE_URL);
+
+  if (options?.action === 'logout') {
+    bridgeUrl.searchParams.set('action', 'logout');
+    return bridgeUrl.toString();
+  }
+
   bridgeUrl.searchParams.set('auth', options?.authMode ?? 'login');
 
   if (options?.planId) {
@@ -427,10 +434,35 @@ export default defineBackground(() => {
             await revokePluginToken(stored.token);
           }
           await clearPluginSession();
+          const logoutTab = await browser.tabs.create({
+            url: buildBridgeUrl({ action: 'logout' }),
+            active: false,
+          });
+          if (logoutTab.id) {
+            setTimeout(() => {
+              browser.tabs.remove(logoutTab.id!).catch(() => undefined);
+            }, 5000);
+          }
           sendResponse({ ok: true });
         })
         .catch((error) => {
           console.error('logout plugin failed:', error);
+          sendResponse({ ok: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'CLEAR_PLUGIN_SESSION') {
+      getStoredPluginSession()
+        .then(async (stored) => {
+          if (stored.token) {
+            await revokePluginToken(stored.token);
+          }
+          await clearPluginSession();
+          sendResponse({ ok: true });
+        })
+        .catch((error) => {
+          console.error('clear plugin session failed:', error);
           sendResponse({ ok: false });
         });
       return true;

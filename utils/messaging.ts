@@ -18,7 +18,8 @@ export type MessageType =
   | { type: 'OPEN_REGISTER'; payload?: never }
   | { type: 'OPEN_PAYMENT_PAGE'; payload?: { planId?: string } }
   | { type: 'GET_STATE'; payload?: never }
-  | { type: 'LOGOUT_PLUGIN'; payload?: never };
+  | { type: 'LOGOUT_PLUGIN'; payload?: never }
+  | { type: 'CLEAR_PLUGIN_SESSION'; payload?: never };
 
 export const WEBSITE_URL = 'https://smarterexcel.com';
 

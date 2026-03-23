@@ -66,6 +66,10 @@ export default defineContentScript({
       if (e.data?.type === 'SE_PLUGIN_SYNC' && e.data?.data) {
         browser.runtime.sendMessage({ type: 'PLUGIN_SYNC', data: e.data.data });
       }
+
+      if (e.data?.type === 'SE_PLUGIN_LOGOUT') {
+        browser.runtime.sendMessage({ type: 'CLEAR_PLUGIN_SESSION' });
+      }
     });
 
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
