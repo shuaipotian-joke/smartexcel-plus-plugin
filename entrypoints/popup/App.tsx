@@ -29,6 +29,25 @@ export default function App() {
     loadCreditState();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const handleStorageChange = (
+      changes: Record<string, { newValue?: unknown }>
+    ) => {
+      if (
+        changes.se_credits ||
+        changes.se_logged_in ||
+        changes.se_email ||
+        changes.se_name ||
+        changes.se_plugin_token
+      ) {
+        void loadCreditState();
+      }
+    };
+
+    browser.storage.onChanged.addListener(handleStorageChange);
+    return () => browser.storage.onChanged.removeListener(handleStorageChange);
+  }, []);
+
   async function loadTables() {
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
