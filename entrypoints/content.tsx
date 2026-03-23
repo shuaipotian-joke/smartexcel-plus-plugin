@@ -9,29 +9,46 @@ type CreditCheckResult = {
   remaining?: number;
   isLoggedIn: boolean;
   reason?: string;
+  requiredCredits?: number;
 };
 
-async function requestCheckAndConsume(): Promise<CreditCheckResult> {
+type ExportAccessResult = CreditCheckResult & { openedFlow?: 'login' | 'payment' };
+
+async function requestCheckAndConsume(amount = 1): Promise<CreditCheckResult> {
   try {
-    return await browser.runtime.sendMessage({ type: 'CHECK_AND_CONSUME' });
+    return await browser.runtime.sendMessage({
+      type: 'CHECK_AND_CONSUME',
+      payload: { amount },
+    });
   } catch {
     return { allowed: false, reason: 'error', isLoggedIn: false };
   }
 }
 
-async function ensureExportAccess() {
-  const result = await requestCheckAndConsume();
+async function ensureExportAccess(amount = 1): Promise<ExportAccessResult> {
+  const result = await requestCheckAndConsume(amount);
   if (result.allowed) {
-    return true;
+    return result;
   }
 
   if (result.reason === 'not_logged_in') {
     await browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
-    return false;
+    return { ...result, openedFlow: 'login' };
   }
 
   await browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
-  return false;
+  return { ...result, openedFlow: 'payment' };
+}
+
+function findTableById(
+  tables: HTMLTableElement[],
+  tableId?: string
+): HTMLTableElement | undefined {
+  if (!tableId) {
+    return tables[0];
+  }
+
+  return tables.find((table) => table.dataset.smartexcelTableId === tableId);
 }
 
 export default defineContentScript({
@@ -94,16 +111,16 @@ export default defineContentScript({
 
         case 'EXPORT_TABLE': {
           void (async () => {
-            const allowed = await ensureExportAccess();
-            if (!allowed) {
-              sendResponse({ ok: false });
+            const access = await ensureExportAccess(1);
+            if (!access.allowed) {
+              sendResponse({ ok: false, reason: access.reason });
               return;
             }
 
             const { format } = message.payload;
-            const table = tables[0];
+            const table = findTableById(tables, message.payload?.tableId);
             if (table) {
-              exportToExcel(parseTable(table), format);
+              exportToExcel(parseTable(table), { format });
             }
             sendResponse({ ok: true });
           })();
@@ -112,9 +129,14 @@ export default defineContentScript({
 
         case 'EXPORT_ALL': {
           void (async () => {
-            const allowed = await ensureExportAccess();
-            if (!allowed) {
-              sendResponse({ ok: false });
+            const tableCount = tables.length;
+            const access = await ensureExportAccess(tableCount);
+            if (!access.allowed) {
+              sendResponse({
+                ok: false,
+                reason: access.reason,
+                requiredCredits: access.requiredCredits ?? tableCount,
+              });
               return;
             }
 
@@ -129,13 +151,13 @@ export default defineContentScript({
 
         case 'COPY_TABLE': {
           void (async () => {
-            const allowed = await ensureExportAccess();
-            if (!allowed) {
-              sendResponse({ ok: false });
+            const access = await ensureExportAccess(1);
+            if (!access.allowed) {
+              sendResponse({ ok: false, reason: access.reason });
               return;
             }
 
-            const target = tables[0];
+            const target = findTableById(tables, message.payload?.tableId);
             if (target) {
               await copyTableToClipboard(parseTable(target));
             }

@@ -18,6 +18,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [creditState, setCreditState] = useState<CreditState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{
+    text: string;
+    showBuy: boolean;
+  } | null>(null);
 
   const lang = useExtensionStore((s) => s.lang);
   const setLang = useExtensionStore((s) => s.setLang);
@@ -72,11 +76,42 @@ export default function App() {
   }
 
   const handleExportAll = useCallback(async () => {
+    if (tables.length === 0) {
+      return;
+    }
+
+    setActionMessage(null);
+
+    if (!creditState?.loggedIn) {
+      await browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
+      return;
+    }
+
+    const requiredCredits = tables.length;
+    const confirmed = window.confirm(
+      t('confirmExportAll', lang, {
+        count: tables.length,
+        credits: requiredCredits,
+      }),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (tab.id) {
-      browser.tabs.sendMessage(tab.id, { type: 'EXPORT_ALL' });
+      const result = await browser.tabs.sendMessage(tab.id, { type: 'EXPORT_ALL' });
+      if (!result?.ok && result?.reason === 'no_credits') {
+        setActionMessage({
+          text: t('insufficientCreditsForAll', lang, {
+            credits: result.requiredCredits ?? requiredCredits,
+          }),
+          showBuy: true,
+        });
+      }
     }
-  }, []);
+  }, [creditState?.loggedIn, lang, tables.length]);
 
   const handleAddCredits = useCallback(() => {
     browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
@@ -158,6 +193,20 @@ export default function App() {
           >
             {creditState.loggedIn ? t('addCredits', lang) : t('login', lang)}
           </button>
+        </div>
+      )}
+
+      {actionMessage && (
+        <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>{actionMessage.text}</span>{' '}
+          {actionMessage.showBuy && (
+            <button
+              className="font-medium underline underline-offset-2"
+              onClick={handleAddCredits}
+            >
+              {t('clickToBuyCredits', lang)}
+            </button>
+          )}
         </div>
       )}
 

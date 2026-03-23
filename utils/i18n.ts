@@ -27,6 +27,9 @@ const zh = {
   // Tables list
   tablesDetected: '检测到 {n} 个表格',
   exportAll: '全部导出',
+  confirmExportAll: '当前识别到 {count} 个表格，本次会消耗 {credits} 积分，确定继续吗？',
+  insufficientCreditsForAll: '积分不足，本次导出需要 {credits} 积分。',
+  clickToBuyCredits: '点击此处购买积分',
 
   // Table card
   exportExcel: '导出 Excel',
@@ -84,6 +87,9 @@ const en: Record<TranslationKey, string> = {
 
   tablesDetected: '{n} table(s) detected',
   exportAll: 'Export All',
+  confirmExportAll: '{count} tables detected. This export will cost {credits} credits. Continue?',
+  insufficientCreditsForAll: 'Insufficient credits. This export requires {credits} credits.',
+  clickToBuyCredits: 'Click here to buy credits',
 
   exportExcel: 'Export Excel',
   csvLabel: 'CSV',

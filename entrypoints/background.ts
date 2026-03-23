@@ -225,12 +225,14 @@ async function openWebsiteWithPluginLogin(
   await browser.tabs.create({ url: fallbackUrl });
 }
 
-async function consumeLoggedInCredit(token: string) {
+async function consumeLoggedInCredit(token: string, amount: number) {
   const response = await fetch(PLUGIN_CONSUME_URL, {
     method: 'POST',
     headers: {
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify({ amount }),
   });
 
   if (response.status === 401) {
@@ -261,12 +263,16 @@ async function revokePluginToken(token: string) {
 /**
  * Check if user can export and consume one credit.
  */
-async function checkAndConsume(): Promise<{
+async function checkAndConsume(amount = 1): Promise<{
   allowed: boolean;
   remaining?: number;
   isLoggedIn: boolean;
   reason?: string;
+  requiredCredits?: number;
 }> {
+  const normalizedAmount = Number.isFinite(amount)
+    ? Math.max(1, Math.floor(amount))
+    : 1;
   const stored = await getStoredPluginSession();
 
   if (!stored.token) {
@@ -274,7 +280,7 @@ async function checkAndConsume(): Promise<{
   }
 
   try {
-    const result = await consumeLoggedInCredit(stored.token);
+    const result = await consumeLoggedInCredit(stored.token, normalizedAmount);
     if (result?.success) {
       await browser.storage.local.set({
         se_logged_in: true,
@@ -296,6 +302,7 @@ async function checkAndConsume(): Promise<{
       reason:
         result.error === 'insufficient_credits' ? 'no_credits' : 'internal_error',
       isLoggedIn: true,
+      requiredCredits: result.required ?? normalizedAmount,
     };
   } catch (error) {
     console.error('logged-in consume failed:', error);
@@ -412,7 +419,7 @@ export default defineBackground(() => {
 
     // Check and consume one export credit (async)
     if (message.type === 'CHECK_AND_CONSUME') {
-      checkAndConsume().then(sendResponse);
+      checkAndConsume(message.payload?.amount).then(sendResponse);
       return true; // keep channel open for async response
     }
 

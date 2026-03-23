@@ -16,6 +16,7 @@ export function exportToExcel(
 
   const data = buildSheetData(table, withIndex);
   const worksheet = XLSX.utils.aoa_to_sheet(data);
+  applyMerges(worksheet, table, withIndex);
   autoFitColumns(worksheet, data);
 
   const workbook = XLSX.utils.book_new();
@@ -36,6 +37,7 @@ export function exportMultipleTables(
   tables.forEach((table, i) => {
     const data = buildSheetData(table, withIndex);
     const worksheet = XLSX.utils.aoa_to_sheet(data);
+    applyMerges(worksheet, table, withIndex);
     autoFitColumns(worksheet, data);
 
     let sheetName = sanitizeSheetName(table.title);
@@ -87,6 +89,36 @@ function autoFitColumns(worksheet: XLSX.WorkSheet, data: string[][]): void {
   });
 
   worksheet['!cols'] = colWidths.map((w) => ({ wch: w }));
+}
+
+function applyMerges(
+  worksheet: XLSX.WorkSheet,
+  table: ParsedTable,
+  withIndex: boolean,
+): void {
+  const headerRowOffset = table.headers.length > 0 ? 1 : 0;
+  const colOffset = withIndex ? 1 : 0;
+
+  worksheet['!merges'] = table.merges
+    .map((merge) => {
+      const isInsideHeader = merge.endRow < headerRowOffset;
+      if (isInsideHeader) {
+        return null;
+      }
+
+      const startRow = merge.startRow - headerRowOffset;
+      const endRow = merge.endRow - headerRowOffset;
+
+      if (startRow < 0 || endRow < 0) {
+        return null;
+      }
+
+      return {
+        s: { r: startRow, c: merge.startCol + colOffset },
+        e: { r: endRow, c: merge.endCol + colOffset },
+      };
+    })
+    .filter((merge): merge is NonNullable<typeof merge> => merge !== null);
 }
 
 function sanitizeSheetName(name: string): string {

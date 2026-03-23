@@ -3,6 +3,12 @@ export interface ParsedTable {
   title: string;
   headers: string[];
   rows: string[][];
+  merges: Array<{
+    startRow: number;
+    endRow: number;
+    startCol: number;
+    endCol: number;
+  }>;
   element: HTMLTableElement;
   rowCount: number;
   colCount: number;
@@ -10,54 +16,107 @@ export interface ParsedTable {
   cssRowNumbers: string[];
 }
 
-let tableCounter = 0;
-
 export function detectTables(): HTMLTableElement[] {
-  return Array.from(document.querySelectorAll('table')).filter((table) => {
-    const rows = table.querySelectorAll('tr');
-    return rows.length > 0;
-  });
+  return Array.from(document.querySelectorAll('table'))
+    .filter((table) => {
+      const rows = table.querySelectorAll('tr');
+      return rows.length > 0;
+    })
+    .map((table, index) => {
+      if (!table.dataset.smartexcelTableId) {
+        table.dataset.smartexcelTableId = `table-${index + 1}`;
+      }
+      return table;
+    });
 }
 
 export function parseTable(table: HTMLTableElement): ParsedTable {
   const headers: string[] = [];
   const rows: string[][] = [];
   const dataRowElements: Element[] = [];
+  const merges: ParsedTable['merges'] = [];
+
+  const tableRows = Array.from(table.querySelectorAll('tr'));
+  const grid: string[][] = [];
+  const occupancy: boolean[][] = [];
 
   const thead = table.querySelector('thead');
-  if (thead) {
-    const lastHeaderRow = thead.querySelector('tr:last-child');
-    if (lastHeaderRow) {
-      lastHeaderRow.querySelectorAll('th, td').forEach((cell) => {
-        headers.push(getCellText(cell as HTMLElement));
-      });
+  tableRows.forEach((row, rowIndex) => {
+    const cells = Array.from(row.querySelectorAll(':scope > th, :scope > td'));
+    if (cells.length === 0) {
+      return;
     }
+
+    if (!grid[rowIndex]) {
+      grid[rowIndex] = [];
+    }
+
+    let colIndex = 0;
+    cells.forEach((cell) => {
+      while (occupancy[rowIndex]?.[colIndex]) {
+        colIndex += 1;
+      }
+
+      const cellText = getCellText(cell as HTMLElement);
+      const colspan = Math.max(1, Number.parseInt(cell.getAttribute('colspan') || '1', 10) || 1);
+      const rowspan = Math.max(1, Number.parseInt(cell.getAttribute('rowspan') || '1', 10) || 1);
+
+      for (let rowOffset = 0; rowOffset < rowspan; rowOffset += 1) {
+        const targetRow = rowIndex + rowOffset;
+        if (!grid[targetRow]) {
+          grid[targetRow] = [];
+        }
+        if (!occupancy[targetRow]) {
+          occupancy[targetRow] = [];
+        }
+
+        for (let colOffset = 0; colOffset < colspan; colOffset += 1) {
+          const targetCol = colIndex + colOffset;
+          occupancy[targetRow][targetCol] = true;
+          grid[targetRow][targetCol] =
+            rowOffset === 0 && colOffset === 0 ? cellText : '';
+        }
+      }
+
+      if (rowspan > 1 || colspan > 1) {
+        merges.push({
+          startRow: rowIndex,
+          endRow: rowIndex + rowspan - 1,
+          startCol: colIndex,
+          endCol: colIndex + colspan - 1,
+        });
+      }
+
+      colIndex += colspan;
+    });
+  });
+
+  const colCount = grid.reduce((max, row) => Math.max(max, row.length), 0);
+  const normalizedGrid = grid.map((row) =>
+    Array.from({ length: colCount }, (_, index) => row[index] ?? '')
+  );
+
+  const headerRowCount = thead
+    ? thead.querySelectorAll('tr').length
+    : normalizedGrid.length > 0 && tableRows[0]?.querySelector('th') !== null
+      ? 1
+      : 0;
+
+  if (headerRowCount > 0) {
+    const headerRow = normalizedGrid[headerRowCount - 1] ?? [];
+    headers.push(...headerRow);
   }
 
-  const bodyRows = thead
-    ? table.querySelectorAll(':scope > tbody > tr')
-    : table.querySelectorAll('tr');
-
-  bodyRows.forEach((row, index) => {
-    if (!thead && index === 0) {
-      const isHeader = row.querySelector('th') !== null;
-      if (isHeader) {
-        row.querySelectorAll('th, td').forEach((cell) => {
-          headers.push(getCellText(cell as HTMLElement));
-        });
-        return;
-      }
+  normalizedGrid.forEach((rowData, index) => {
+    if (index < headerRowCount) {
+      return;
     }
-
-    const cells = row.querySelectorAll('td, th');
-    const rowData: string[] = [];
-    cells.forEach((cell) => {
-      rowData.push(getCellText(cell as HTMLElement));
-    });
 
     if (rowData.length > 0 && rowData.some((cell) => cell.trim() !== '')) {
       rows.push(rowData);
-      dataRowElements.push(row);
+      if (tableRows[index]) {
+        dataRowElements.push(tableRows[index]);
+      }
     }
   });
 
@@ -66,7 +125,7 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
   const title =
     caption?.textContent?.trim() ||
     ariaLabel ||
-    `Table ${++tableCounter}`;
+    `Table ${table.dataset.smartexcelTableId ?? 'unknown'}`;
 
   const hasCssRowNumbers = detectCssRowNumbers(table);
   const cssRowNumbers = hasCssRowNumbers
@@ -74,13 +133,14 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
     : [];
 
   return {
-    id: `table-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: table.dataset.smartexcelTableId ?? 'table-unknown',
     title,
     headers,
     rows,
+    merges,
     element: table,
     rowCount: rows.length,
-    colCount: Math.max(headers.length, rows[0]?.length ?? 0),
+    colCount,
     hasCssRowNumbers,
     cssRowNumbers,
   };
