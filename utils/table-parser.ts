@@ -31,6 +31,7 @@ export function detectTables(): HTMLTableElement[] {
 }
 
 export function parseTable(table: HTMLTableElement): ParsedTable {
+  ensureStableTableId(table);
   const headers: string[] = [];
   const rows: string[][] = [];
   const dataRowElements: Element[] = [];
@@ -74,7 +75,7 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
           const targetCol = colIndex + colOffset;
           occupancy[targetRow][targetCol] = true;
           grid[targetRow][targetCol] =
-            rowOffset === 0 && colOffset === 0 ? cellText : '';
+            colOffset === 0 ? cellText : '';
         }
       }
 
@@ -125,6 +126,8 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
   const title =
     caption?.textContent?.trim() ||
     ariaLabel ||
+    findNearbyHeading(table) ||
+    sanitizeDocumentTitle(document.title) ||
     `Table ${table.dataset.smartexcelTableId ?? 'unknown'}`;
 
   const hasCssRowNumbers = detectCssRowNumbers(table);
@@ -144,6 +147,54 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
     hasCssRowNumbers,
     cssRowNumbers,
   };
+}
+
+function ensureStableTableId(table: HTMLTableElement): void {
+  if (table.dataset.smartexcelTableId) {
+    return;
+  }
+
+  const allTables = Array.from(document.querySelectorAll('table'));
+  const index = allTables.indexOf(table);
+  table.dataset.smartexcelTableId = `table-${index >= 0 ? index + 1 : 'unknown'}`;
+}
+
+function findNearbyHeading(table: HTMLTableElement): string {
+  const candidates = [
+    table.closest('section')?.querySelector('h1, h2, h3, h4, h5, h6'),
+    document.querySelector('.mw-page-title-main'),
+    document.querySelector('h1'),
+  ];
+
+  for (const candidate of candidates) {
+    const text = candidate?.textContent?.trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  let node: Element | null = table;
+  while (node) {
+    let sibling = node.previousElementSibling;
+    while (sibling) {
+      if (/^H[1-6]$/.test(sibling.tagName)) {
+        const text = sibling.textContent?.trim();
+        if (text) {
+          return text;
+        }
+      }
+      sibling = sibling.previousElementSibling;
+    }
+    node = node.parentElement;
+  }
+
+  return '';
+}
+
+function sanitizeDocumentTitle(title: string): string {
+  return title
+    .replace(/\s*[-|·•]\s*.+$/, '')
+    .trim();
 }
 
 function detectCssRowNumbers(table: HTMLTableElement): boolean {

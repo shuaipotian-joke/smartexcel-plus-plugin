@@ -101,6 +101,10 @@ function applyMerges(
 
   worksheet['!merges'] = table.merges
     .map((merge) => {
+      if (merge.endRow > merge.startRow) {
+        return null;
+      }
+
       const isInsideHeader = merge.endRow < headerRowOffset;
       if (isInsideHeader) {
         return null;
