@@ -14,16 +14,13 @@ export function exportToExcel(
 ): void {
   const { format = 'xlsx', withIndex = false } = options;
 
-  const data = buildSheetData(table, withIndex);
-  const worksheet = XLSX.utils.aoa_to_sheet(data);
-  applyMerges(worksheet, table, withIndex);
-  autoFitColumns(worksheet, data);
+  const worksheet = buildWorksheet(table, withIndex);
 
   const workbook = XLSX.utils.book_new();
   const sheetName = sanitizeSheetName(table.title);
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-  const fileName = `${table.title.replace(/[^\w\u4e00-\u9fff]/g, '_')}.${format}`;
+  const fileName = `${sanitizeFileName(table.title || table.id)}.${format}`;
   XLSX.writeFile(workbook, fileName, { bookType: format });
 }
 
@@ -35,10 +32,7 @@ export function exportMultipleTables(
   const workbook = XLSX.utils.book_new();
 
   tables.forEach((table, i) => {
-    const data = buildSheetData(table, withIndex);
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
-    applyMerges(worksheet, table, withIndex);
-    autoFitColumns(worksheet, data);
+    const worksheet = buildWorksheet(table, withIndex);
 
     let sheetName = sanitizeSheetName(table.title);
     if (sheetName.length > 28) sheetName = sheetName.slice(0, 28);
@@ -47,7 +41,7 @@ export function exportMultipleTables(
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   });
 
-  XLSX.writeFile(workbook, `${fileName}.xlsx`, { bookType: 'xlsx' });
+  XLSX.writeFile(workbook, `${sanitizeFileName(fileName)}.xlsx`, { bookType: 'xlsx' });
 }
 
 export function copyTableToClipboard(
@@ -74,6 +68,23 @@ function buildSheetData(table: ParsedTable, withIndex: boolean): string[][] {
   });
 
   return [headers, ...rows];
+}
+
+function buildWorksheet(table: ParsedTable, withIndex: boolean): XLSX.WorkSheet {
+  if (!withIndex) {
+    const clonedTable = table.element.cloneNode(true) as HTMLTableElement;
+    const worksheet = XLSX.utils.table_to_sheet(clonedTable, {
+      raw: false,
+    });
+    autoFitColumns(worksheet, sheetToMatrix(worksheet));
+    return worksheet;
+  }
+
+  const data = buildSheetData(table, withIndex);
+  const worksheet = XLSX.utils.aoa_to_sheet(data);
+  applyMerges(worksheet, table, withIndex);
+  autoFitColumns(worksheet, data);
+  return worksheet;
 }
 
 function autoFitColumns(worksheet: XLSX.WorkSheet, data: string[][]): void {
@@ -127,4 +138,23 @@ function applyMerges(
 
 function sanitizeSheetName(name: string): string {
   return name.replace(/[\\/*?:\[\]]/g, '_').slice(0, 31);
+}
+
+function sanitizeFileName(name: string): string {
+  const sanitized = name
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return sanitized || 'table_export';
+}
+
+function sheetToMatrix(worksheet: XLSX.WorkSheet): string[][] {
+  return XLSX.utils.sheet_to_json(worksheet, {
+    header: 1,
+    raw: false,
+    defval: '',
+    blankrows: true,
+  }) as string[][];
 }
