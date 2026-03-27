@@ -52,7 +52,7 @@ function findTableById(
 }
 
 export default defineContentScript({
-  matches: ['<all_urls>'],
+  matches: ['https://smarterexcel.com/*'],
   cssInjectionMode: 'ui',
 
   async main(ctx) {

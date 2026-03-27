@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { TableInfo } from '@/utils/messaging';
 import { useExtensionStore } from '@/utils/store';
 import { t, type Lang } from '@/utils/i18n';
+import { ensureContentScript } from '@/utils/ensure-content-script';
 import SettingsPanel from './SettingsPanel';
 
 type CreditState = {
@@ -56,6 +57,12 @@ export default function App() {
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (tab.id) {
+        const isReady = await ensureContentScript(tab.id);
+        if (!isReady) {
+          setTables([]);
+          return;
+        }
+
         const result = await browser.tabs.sendMessage(tab.id, { type: 'GET_TABLES' });
         setTables(result ?? []);
       }
@@ -101,6 +108,12 @@ export default function App() {
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (tab.id) {
+      const isReady = await ensureContentScript(tab.id);
+      if (!isReady) {
+        setTables([]);
+        return;
+      }
+
       const result = await browser.tabs.sendMessage(tab.id, { type: 'EXPORT_ALL' });
       if (!result?.ok && result?.reason === 'no_credits') {
         setActionMessage({
@@ -262,6 +275,11 @@ function TableCard({ table, lang }: { table: TableInfo; lang: Lang }) {
     async (format: 'xlsx' | 'csv') => {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (tab.id) {
+        const isReady = await ensureContentScript(tab.id);
+        if (!isReady) {
+          return;
+        }
+
         browser.tabs.sendMessage(tab.id, {
           type: 'EXPORT_TABLE',
           payload: { tableId: table.id, format },

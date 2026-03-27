@@ -5,6 +5,7 @@ const PLUGIN_ME_URL = `${SMARTEXCEL_URL}/api/plugin/auth/me`;
 const PLUGIN_CONSUME_URL = `${SMARTEXCEL_URL}/api/plugin/consume`;
 const PLUGIN_CREATE_LOGIN_TICKET_URL = `${SMARTEXCEL_URL}/api/plugin/auth/create-login-ticket`;
 const PLUGIN_REVOKE_URL = `${SMARTEXCEL_URL}/api/plugin/auth/revoke`;
+const CONTENT_SCRIPT_PATH = 'content-scripts/content.js';
 
 function buildBridgeUrl(options?: {
   authMode?: 'login' | 'register';
@@ -260,6 +261,40 @@ async function revokePluginToken(token: string) {
   }
 }
 
+function canInjectIntoUrl(url?: string) {
+  if (!url) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+async function ensureContentScript(tabId: number) {
+  try {
+    await browser.tabs.sendMessage(tabId, { type: 'GET_TABLES' });
+    return true;
+  } catch {
+    // Inject on demand below.
+  }
+
+  const tab = await browser.tabs.get(tabId);
+  if (!canInjectIntoUrl(tab.url)) {
+    return false;
+  }
+
+  await browser.scripting.executeScript({
+    target: { tabId },
+    files: [CONTENT_SCRIPT_PATH],
+  });
+
+  return true;
+}
+
 /**
  * Check if user can export and consume one credit.
  */
@@ -488,6 +523,11 @@ export default defineBackground(() => {
 
   browser.action.onClicked.addListener(async (tab) => {
     if (tab.id) {
+      const isReady = await ensureContentScript(tab.id);
+      if (!isReady) {
+        return;
+      }
+
       await browser.tabs.sendMessage(tab.id, { type: 'TOGGLE_PANEL' });
     }
   });
