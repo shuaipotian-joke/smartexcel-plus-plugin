@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { parseTable, type ParsedTable } from '@/utils/table-parser';
-import { exportToExcel, copyTableToClipboard } from '@/utils/excel-export';
+import { exportToExcel } from '@/utils/excel-export';
 import { useExtensionStore } from '@/utils/store';
 import { t, type Lang } from '@/utils/i18n';
 
@@ -45,7 +45,6 @@ export default function TableOverlay() {
     table: null,
   });
   const [menuOpen, setMenuOpen] = useState(false);
-  const [withIndex, setWithIndex] = useState(false);
   const [toast, setToast] = useState('');
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const fabRef = useRef<HTMLDivElement>(null);
@@ -66,14 +65,6 @@ export default function TableOverlay() {
     browser.storage.onChanged.addListener(handler);
     return () => browser.storage.onChanged.removeListener(handler);
   }, []);
-
-  useEffect(() => {
-    if (fab.table?.hasCssRowNumbers) {
-      setWithIndex(true);
-    } else {
-      setWithIndex(false);
-    }
-  }, [fab.table]);
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -148,7 +139,7 @@ export default function TableOverlay() {
       }
 
       try {
-        exportToExcel(fab.table, { format, withIndex });
+        exportToExcel(fab.table, { format, withIndex: false });
         const fmt = format.toUpperCase();
         const hint = result.remaining !== undefined
           ? t('creditsLeft', lang, { n: result.remaining })
@@ -158,44 +149,8 @@ export default function TableOverlay() {
         showToast(t('exportFailed', lang));
       }
     },
-    [fab.table, withIndex, showToast],
+    [fab.table, lang, showToast],
   );
-
-  const handleCopy = useCallback(async () => {
-    if (!fab.table) return;
-    setMenuOpen(false);
-
-    const result = await requestCheckAndConsume();
-
-    if (!result.allowed) {
-      if (result.reason === 'not_logged_in') {
-        showToast(t('loginRequiredToExport', lang));
-        openLoginPage();
-        return;
-      }
-
-      openPaymentPage();
-      return;
-    }
-
-    try {
-      await copyTableToClipboard(fab.table, withIndex);
-      const hint = result.remaining !== undefined
-        ? t('creditsLeft', lang, { n: result.remaining })
-        : '';
-      showToast(t('copiedToClipboard', lang) + hint);
-    } catch {
-      showToast(t('copyFailed', lang));
-    }
-  }, [fab.table, withIndex, showToast]);
-
-  const handleSendToWeb = useCallback(() => {
-    browser.runtime.sendMessage({
-      type: 'OPEN_WEBSITE',
-      payload: { tableId: fab.table?.id },
-    });
-    setMenuOpen(false);
-  }, [fab.table]);
 
   if (!fab.visible || !isEnabled) return null;
 
@@ -279,47 +234,8 @@ export default function TableOverlay() {
               📋 {fab.table ? t('rowsCols', lang, { r: fab.table.rowCount, c: fab.table.colCount }) : ''}
             </div>
 
-            {/* Index toggle — auto-shown when CSS row numbers detected */}
-            <div
-              style={{
-                padding: '8px 14px', display: 'flex', alignItems: 'center',
-                justifyContent: 'space-between', borderBottom: '1px solid #f3f4f6',
-                backgroundColor: fab.table?.hasCssRowNumbers ? '#eff6ff' : 'transparent',
-              }}
-            >
-              <span style={{ fontSize: '12px', color: '#374151' }}>
-                {fab.table?.hasCssRowNumbers ? t('hasRowNumbers', lang) : t('addRowNumbers', lang)}
-              </span>
-              <label style={{
-                position: 'relative', display: 'inline-block',
-                width: '36px', height: '20px', cursor: 'pointer',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={withIndex}
-                  onChange={(e) => setWithIndex(e.target.checked)}
-                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                />
-                <span style={{
-                  position: 'absolute', inset: 0, borderRadius: '10px',
-                  backgroundColor: withIndex ? '#1a73f5' : '#d1d5db',
-                  transition: 'background-color 0.2s',
-                }} />
-                <span style={{
-                  position: 'absolute', top: '2px',
-                  left: withIndex ? '18px' : '2px',
-                  width: '16px', height: '16px', borderRadius: '50%',
-                  backgroundColor: '#fff', transition: 'left 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                }} />
-              </label>
-            </div>
-
             <MenuItem icon="📊" label={t('exportAsExcel', lang)} sublabel=".xlsx" onClick={() => handleExport('xlsx')} />
             <MenuItem icon="📄" label={t('exportAsCsv', lang)} sublabel=".csv" onClick={() => handleExport('csv')} />
-            <MenuItem icon="📋" label={t('copyToClipboard', lang)} onClick={handleCopy} />
-            <div style={{ height: '1px', backgroundColor: '#f3f4f6', margin: '0 10px' }} />
-            <MenuItem icon="🚀" label={t('sendToSmartExcel', lang)} sublabel={t('aiProcess', lang)} onClick={handleSendToWeb} />
           </div>
         )}
       </div>

@@ -6,6 +6,9 @@ const PLUGIN_CONSUME_URL = `${SMARTEXCEL_URL}/api/plugin/consume`;
 const PLUGIN_CREATE_LOGIN_TICKET_URL = `${SMARTEXCEL_URL}/api/plugin/auth/create-login-ticket`;
 const PLUGIN_REVOKE_URL = `${SMARTEXCEL_URL}/api/plugin/auth/revoke`;
 const CONTENT_SCRIPT_PATH = 'content-scripts/content.js';
+const CONTEXT_MENU_ROOT_ID = 'smartexcel-context-root';
+const CONTEXT_MENU_EXPORT_XLSX_ID = 'smartexcel-context-export-xlsx';
+const CONTEXT_MENU_EXPORT_CSV_ID = 'smartexcel-context-export-csv';
 
 function buildBridgeUrl(options?: {
   authMode?: 'login' | 'register';
@@ -295,6 +298,35 @@ async function ensureContentScript(tabId: number) {
   return true;
 }
 
+const contextTableByTabId = new Map<number, string | null>();
+
+function createContextMenus() {
+  browser.contextMenus.removeAll(() => {
+    browser.contextMenus.create({
+      id: CONTEXT_MENU_ROOT_ID,
+      title: 'SmartExcel',
+      contexts: ['all'],
+      documentUrlPatterns: ['http://*/*', 'https://*/*'],
+    });
+
+    browser.contextMenus.create({
+      id: CONTEXT_MENU_EXPORT_XLSX_ID,
+      parentId: CONTEXT_MENU_ROOT_ID,
+      title: 'Export as Excel',
+      contexts: ['all'],
+      documentUrlPatterns: ['http://*/*', 'https://*/*'],
+    });
+
+    browser.contextMenus.create({
+      id: CONTEXT_MENU_EXPORT_CSV_ID,
+      parentId: CONTEXT_MENU_ROOT_ID,
+      title: 'Export as CSV',
+      contexts: ['all'],
+      documentUrlPatterns: ['http://*/*', 'https://*/*'],
+    });
+  });
+}
+
 /**
  * Check if user can export and consume one credit.
  */
@@ -392,7 +424,21 @@ async function syncPluginAuth(data: {
 // ─── Main background entry ─────────────────────────────────────────────────
 
 export default defineBackground(() => {
+  createContextMenus();
+
+  browser.runtime.onInstalled.addListener(() => {
+    createContextMenus();
+  });
+
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.type === 'SET_CONTEXT_TABLE') {
+      if (_sender.tab?.id != null) {
+        contextTableByTabId.set(_sender.tab.id, message.payload?.tableId ?? null);
+      }
+      sendResponse({ ok: true });
+      return false;
+    }
+
     if (message.type === 'OPEN_WEBSITE') {
       const redirectTo = buildWebsiteRedirectPath(message.payload?.tableId);
       const fallbackUrl = message.payload?.tableId
@@ -529,6 +575,40 @@ export default defineBackground(() => {
       }
 
       await browser.tabs.sendMessage(tab.id, { type: 'TOGGLE_PANEL' });
+    }
+  });
+
+  browser.tabs.onRemoved.addListener((tabId) => {
+    contextTableByTabId.delete(tabId);
+  });
+
+  browser.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (!tab?.id) {
+      return;
+    }
+
+    if (
+      info.menuItemId !== CONTEXT_MENU_EXPORT_XLSX_ID &&
+      info.menuItemId !== CONTEXT_MENU_EXPORT_CSV_ID
+    ) {
+      return;
+    }
+
+    const isReady = await ensureContentScript(tab.id);
+    if (!isReady) {
+      return;
+    }
+
+    const format = info.menuItemId === CONTEXT_MENU_EXPORT_CSV_ID ? 'csv' : 'xlsx';
+    const tableId = contextTableByTabId.get(tab.id) ?? null;
+
+    try {
+      await browser.tabs.sendMessage(tab.id, {
+        type: 'EXPORT_CONTEXT_TABLE',
+        payload: { tableId, format },
+      });
+    } catch (error) {
+      console.error('context menu export failed:', error);
     }
   });
 });

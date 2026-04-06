@@ -11,8 +11,10 @@ export type MessageType =
   | { type: 'GET_TABLES'; payload?: never }
   | { type: 'TABLES_RESULT'; payload: TableInfo[] }
   | { type: 'EXPORT_TABLE'; payload: { tableId: string; format: 'xlsx' | 'csv' } }
+  | { type: 'EXPORT_CONTEXT_TABLE'; payload: { tableId?: string | null; format: 'xlsx' | 'csv' } }
   | { type: 'COPY_TABLE'; payload: { tableId: string } }
   | { type: 'EXPORT_ALL'; payload?: never }
+  | { type: 'SET_CONTEXT_TABLE'; payload: { tableId: string | null } }
   | { type: 'OPEN_WEBSITE'; payload: { tableId?: string } }
   | { type: 'OPEN_LOGIN'; payload?: never }
   | { type: 'OPEN_REGISTER'; payload?: never }

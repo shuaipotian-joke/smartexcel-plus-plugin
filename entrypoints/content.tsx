@@ -52,7 +52,7 @@ function findTableById(
 }
 
 export default defineContentScript({
-  matches: ['https://smarterexcel.com/*'],
+  matches: ['http://*/*', 'https://*/*'],
   cssInjectionMode: 'ui',
 
   async main(ctx) {
@@ -88,6 +88,22 @@ export default defineContentScript({
         browser.runtime.sendMessage({ type: 'CLEAR_PLUGIN_SESSION' });
       }
     });
+
+    document.addEventListener(
+      'contextmenu',
+      (event: MouseEvent) => {
+        const target = event.target as HTMLElement | null;
+        const table = target?.closest('table') as HTMLTableElement | null;
+
+        browser.runtime.sendMessage({
+          type: 'SET_CONTEXT_TABLE',
+          payload: {
+            tableId: table ? parseTable(table).id : null,
+          },
+        }).catch(() => undefined);
+      },
+      true,
+    );
 
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const tables = detectTables();
@@ -161,6 +177,27 @@ export default defineContentScript({
             if (target) {
               await copyTableToClipboard(parseTable(target));
             }
+            sendResponse({ ok: true });
+          })();
+          break;
+        }
+
+        case 'EXPORT_CONTEXT_TABLE': {
+          void (async () => {
+            const access = await ensureExportAccess(1);
+            if (!access.allowed) {
+              sendResponse({ ok: false, reason: access.reason });
+              return;
+            }
+
+            const { format, tableId } = message.payload ?? {};
+            const table = findTableById(tables, tableId);
+            if (!table) {
+              sendResponse({ ok: false, reason: 'table_not_found' });
+              return;
+            }
+
+            exportToExcel(parseTable(table), { format });
             sendResponse({ ok: true });
           })();
           break;

@@ -7,9 +7,10 @@ export default defineConfig({
     name: 'SmartExcel - Table to Excel Exporter',
     description: '智能识别网页表格，一键导出为 Excel 文件',
     version: packageJson.version,
-    permissions: ['activeTab', 'storage', 'scripting'],
+    permissions: ['activeTab', 'storage', 'scripting', 'contextMenus'],
     host_permissions: [
-      'https://smarterexcel.com/*',
+      'http://*/*',
+      'https://*/*',
     ],
     icons: {
       128: '/icon-128.png',

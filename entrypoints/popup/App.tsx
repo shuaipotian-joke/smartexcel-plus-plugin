@@ -256,16 +256,6 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      <div className="border-t px-4 py-3">
-        <button
-          className="text-xs text-gray-400 hover:text-brand-600 transition-colors"
-          onClick={() => browser.runtime.sendMessage({ type: 'OPEN_WEBSITE' })}
-        >
-          {t('openWebsite', lang)}
-        </button>
-      </div>
     </div>
   );
 }
