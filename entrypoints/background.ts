@@ -9,6 +9,27 @@ const CONTENT_SCRIPT_PATH = 'content-scripts/content.js';
 const CONTEXT_MENU_ROOT_ID = 'smartexcel-context-root';
 const CONTEXT_MENU_EXPORT_XLSX_ID = 'smartexcel-context-export-xlsx';
 const CONTEXT_MENU_EXPORT_CSV_ID = 'smartexcel-context-export-csv';
+type ContextMenuState = {
+  tableId: string | null;
+  frameId?: number;
+  isHeaderContext: boolean;
+};
+type PendingContextExport = {
+  tabId: number;
+  frameId?: number;
+  tableId: string;
+  format: 'xlsx' | 'csv';
+};
+
+type PreparedExportResponse = {
+  ok: boolean;
+  reason?: string;
+  file?: {
+    fileName: string;
+    mimeType: string;
+    base64: string;
+  };
+};
 
 function buildBridgeUrl(options?: {
   authMode?: 'login' | 'register';
@@ -291,40 +312,45 @@ async function ensureContentScript(tabId: number) {
   }
 
   await browser.scripting.executeScript({
-    target: { tabId },
+    target: { tabId, allFrames: true },
     files: [CONTENT_SCRIPT_PATH],
   });
 
   return true;
 }
 
-const contextTableByTabId = new Map<number, string | null>();
+const contextStateByTabId = new Map<number, ContextMenuState>();
+let pendingContextExport: PendingContextExport | null = null;
 
 function createContextMenus() {
-  browser.contextMenus.removeAll(() => {
-    browser.contextMenus.create({
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
       id: CONTEXT_MENU_ROOT_ID,
-      title: 'SmartExcel',
-      contexts: ['all'],
+      title: 'SmartExcel 导出',
+      contexts: ['page'],
       documentUrlPatterns: ['http://*/*', 'https://*/*'],
     });
 
-    browser.contextMenus.create({
+    chrome.contextMenus.create({
       id: CONTEXT_MENU_EXPORT_XLSX_ID,
       parentId: CONTEXT_MENU_ROOT_ID,
-      title: 'Export as Excel',
-      contexts: ['all'],
+      title: '导出 Excel',
+      contexts: ['page'],
       documentUrlPatterns: ['http://*/*', 'https://*/*'],
     });
 
-    browser.contextMenus.create({
+    chrome.contextMenus.create({
       id: CONTEXT_MENU_EXPORT_CSV_ID,
       parentId: CONTEXT_MENU_ROOT_ID,
-      title: 'Export as CSV',
-      contexts: ['all'],
+      title: '导出 CSV',
+      contexts: ['page'],
       documentUrlPatterns: ['http://*/*', 'https://*/*'],
     });
   });
+}
+
+function updateContextMenuVisibility(state?: ContextMenuState) {
+  void state;
 }
 
 /**
@@ -416,9 +442,160 @@ async function syncPluginAuth(data: {
       se_user_id: me.userId ?? data.userId,
       se_plugin_token_expires_at: me.tokenExpiresAt ?? data.expiresAt,
     });
+
+    if (pendingContextExport) {
+      const pending = pendingContextExport;
+      pendingContextExport = null;
+      await continuePendingContextExport(pending);
+    }
   } catch (error) {
     console.error('plugin auth sync refresh failed:', error);
   }
+}
+
+async function dispatchContextExport(
+  tabId: number,
+  tableId: string,
+  format: 'xlsx' | 'csv',
+  frameId?: number,
+): Promise<void> {
+  const isReady = await ensureContentScript(tabId);
+  if (!isReady) {
+    return;
+  }
+
+  await browser.tabs.sendMessage(
+    tabId,
+    {
+      type: 'EXPORT_CONTEXT_TABLE',
+      payload: { tableId, format, skipAccessCheck: true },
+    },
+    frameId != null ? { frameId } : undefined,
+  );
+}
+
+async function prepareContextExportFile(
+  tabId: number,
+  tableId: string,
+  format: 'xlsx' | 'csv',
+  frameId?: number,
+): Promise<NonNullable<PreparedExportResponse['file']>> {
+  const isReady = await ensureContentScript(tabId);
+  if (!isReady) {
+    throw new Error('content_script_unavailable');
+  }
+
+  const response = (await browser.tabs.sendMessage(
+    tabId,
+    {
+      type: 'PREPARE_CONTEXT_EXPORT',
+      payload: { tableId, format },
+    },
+    frameId != null ? { frameId } : undefined,
+  )) as PreparedExportResponse | undefined;
+
+  if (!response?.ok || !response.file) {
+    throw new Error(response?.reason ?? 'prepare_context_export_failed');
+  }
+
+  return response.file;
+}
+
+async function downloadPreparedContextExport(
+  file: NonNullable<PreparedExportResponse['file']>,
+): Promise<void> {
+  const dataUrl = `data:${file.mimeType};base64,${file.base64}`;
+  await browser.downloads.download({
+    url: dataUrl,
+    filename: file.fileName,
+    saveAs: false,
+  });
+}
+
+async function notifyContextExportFeedback(
+  tabId: number,
+  format: 'xlsx' | 'csv',
+  remaining?: number,
+  frameId?: number,
+): Promise<void> {
+  try {
+    await browser.tabs.sendMessage(
+      tabId,
+      {
+        type: 'SHOW_EXPORT_FEEDBACK',
+        payload: {
+          format,
+          remaining,
+          used: 1,
+        },
+      },
+      frameId != null ? { frameId } : undefined,
+    );
+  } catch (error) {
+    console.warn('show export feedback failed:', error);
+  }
+}
+
+async function notifyContextExportProgress(
+  tabId: number,
+  frameId?: number,
+): Promise<void> {
+  try {
+    await browser.tabs.sendMessage(
+      tabId,
+      {
+        type: 'SHOW_EXPORT_PROGRESS',
+        payload: {},
+      },
+      frameId != null ? { frameId } : undefined,
+    );
+  } catch (error) {
+    console.warn('show export progress failed:', error);
+  }
+}
+
+async function continuePendingContextExport(
+  pending: PendingContextExport,
+): Promise<number | undefined> {
+  const stored = await getStoredPluginSession();
+  if (!stored.token) {
+    pendingContextExport = pending;
+    await browser.tabs.create({
+      url: buildBridgeUrl({ authMode: 'login' }),
+    });
+    return;
+  }
+
+  const preparedFile = await prepareContextExportFile(
+    pending.tabId,
+    pending.tableId,
+    pending.format,
+    pending.frameId,
+  );
+
+  const access = await checkAndConsume(1);
+
+  if (!access.allowed) {
+    if (access.reason === 'not_logged_in') {
+      pendingContextExport = pending;
+      await browser.tabs.create({
+        url: buildBridgeUrl({ authMode: 'login' }),
+      });
+      return;
+    }
+
+    await openWebsiteWithPluginLogin(
+      buildPaymentRedirectPath(),
+      buildBridgeUrl({
+        authMode: 'register',
+        redirectTo: buildPaymentRedirectPath(),
+      }),
+    );
+    return undefined;
+  }
+
+  await downloadPreparedContextExport(preparedFile);
+  return access.remaining;
 }
 
 // ─── Main background entry ─────────────────────────────────────────────────
@@ -433,7 +610,13 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'SET_CONTEXT_TABLE') {
       if (_sender.tab?.id != null) {
-        contextTableByTabId.set(_sender.tab.id, message.payload?.tableId ?? null);
+        const state: ContextMenuState = {
+          tableId: message.payload?.tableId ?? null,
+          frameId: _sender.frameId,
+          isHeaderContext: Boolean(message.payload?.isHeaderContext),
+        };
+        contextStateByTabId.set(_sender.tab.id, state);
+        updateContextMenuVisibility(state);
       }
       sendResponse({ ok: true });
       return false;
@@ -579,7 +762,10 @@ export default defineBackground(() => {
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {
-    contextTableByTabId.delete(tabId);
+    contextStateByTabId.delete(tabId);
+    if (pendingContextExport?.tabId === tabId) {
+      pendingContextExport = null;
+    }
   });
 
   browser.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -600,13 +786,27 @@ export default defineBackground(() => {
     }
 
     const format = info.menuItemId === CONTEXT_MENU_EXPORT_CSV_ID ? 'csv' : 'xlsx';
-    const tableId = contextTableByTabId.get(tab.id) ?? null;
+    const contextState = contextStateByTabId.get(tab.id);
+    const tableId = contextState?.tableId ?? null;
+    const frameId = contextState?.frameId;
+
+    if (!tableId || !contextState?.isHeaderContext) {
+      return;
+    }
 
     try {
-      await browser.tabs.sendMessage(tab.id, {
-        type: 'EXPORT_CONTEXT_TABLE',
-        payload: { tableId, format },
-      });
+      pendingContextExport = {
+        tabId: tab.id,
+        frameId,
+        tableId,
+        format,
+      };
+      await notifyContextExportProgress(tab.id, frameId);
+      const remaining = await continuePendingContextExport(pendingContextExport);
+      if (remaining !== undefined) {
+        await notifyContextExportFeedback(tab.id, format, remaining, frameId);
+      }
+      updateContextMenuVisibility(undefined);
     } catch (error) {
       console.error('context menu export failed:', error);
     }

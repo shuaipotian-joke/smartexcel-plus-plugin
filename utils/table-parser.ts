@@ -16,12 +16,22 @@ export interface ParsedTable {
   cssRowNumbers: string[];
 }
 
+export interface LogicalTableBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
 export function detectTables(): HTMLTableElement[] {
-  return Array.from(document.querySelectorAll('table'))
-    .filter((table) => {
-      const rows = table.querySelectorAll('tr');
-      return rows.length > 0;
-    })
+  const meaningfulTables = Array.from(document.querySelectorAll('table'))
+    .filter(isMeaningfulTable)
+    .filter((table) => !isFixedReplicaTable(table))
+    .filter((table) => !isSplitHeaderTable(table));
+
+  return meaningfulTables
     .map((table, index) => {
       if (!table.dataset.smartexcelTableId) {
         table.dataset.smartexcelTableId = `table-${index + 1}`;
@@ -32,11 +42,84 @@ export function detectTables(): HTMLTableElement[] {
 
 export function parseTable(table: HTMLTableElement): ParsedTable {
   ensureStableTableId(table);
-  const headers: string[] = [];
   const rows: string[][] = [];
   const dataRowElements: Element[] = [];
-  const merges: ParsedTable['merges'] = [];
+  const parsedGrid = buildParsedGrid(table);
+  const headers = resolveHeaders(table, parsedGrid);
+  const merges = parsedGrid.merges;
+  const colCount = Math.max(parsedGrid.colCount, headers.length);
 
+  parsedGrid.normalizedGrid.forEach((rowData, index) => {
+    if (index < parsedGrid.headerRowCount) {
+      return;
+    }
+
+    if (rowData.length > 0 && rowData.some((cell) => cell.trim() !== '')) {
+      rows.push(rowData);
+      if (parsedGrid.tableRows[index]) {
+        dataRowElements.push(parsedGrid.tableRows[index]);
+      }
+    }
+  });
+
+  const caption = table.querySelector('caption');
+  const ariaLabel = table.getAttribute('aria-label');
+  const title =
+    caption?.textContent?.trim() ||
+    ariaLabel ||
+    findNearbyHeading(table) ||
+    sanitizeDocumentTitle(document.title) ||
+    `Table ${table.dataset.smartexcelTableId ?? 'unknown'}`;
+
+  const hasCssRowNumbers = detectCssRowNumbers(table);
+  const cssRowNumbers = hasCssRowNumbers
+    ? extractCssRowNumbers(dataRowElements)
+    : [];
+
+  return {
+    id: table.dataset.smartexcelTableId ?? 'table-unknown',
+    title,
+    headers,
+    rows,
+    merges,
+    element: table,
+    rowCount: rows.length,
+    colCount,
+    hasCssRowNumbers,
+    cssRowNumbers,
+  };
+}
+
+export function getLogicalTable(table: HTMLTableElement): HTMLTableElement {
+  return findPrimaryTable(table) ?? findLinkedBodyTable(table) ?? table;
+}
+
+export function getLogicalTableBounds(table: HTMLTableElement): LogicalTableBounds {
+  const logicalTable = getLogicalTable(table);
+  const headerTable = findLinkedHeaderTable(logicalTable, buildParsedGrid(logicalTable).colCount);
+
+  const rects = [logicalTable.getBoundingClientRect()];
+  if (headerTable) {
+    rects.push(headerTable.getBoundingClientRect());
+  }
+
+  const left = Math.min(...rects.map((rect) => rect.left));
+  const top = Math.min(...rects.map((rect) => rect.top));
+  const right = Math.max(...rects.map((rect) => rect.right));
+  const bottom = Math.max(...rects.map((rect) => rect.bottom));
+
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
+  };
+}
+
+function buildParsedGrid(table: HTMLTableElement) {
+  const merges: ParsedTable['merges'] = [];
   const tableRows = Array.from(table.querySelectorAll('tr'));
   const grid: string[][] = [];
   const occupancy: boolean[][] = [];
@@ -74,8 +157,7 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
         for (let colOffset = 0; colOffset < colspan; colOffset += 1) {
           const targetCol = colIndex + colOffset;
           occupancy[targetRow][targetCol] = true;
-          grid[targetRow][targetCol] =
-            colOffset === 0 ? cellText : '';
+          grid[targetRow][targetCol] = colOffset === 0 ? cellText : '';
         }
       }
 
@@ -103,50 +185,200 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
       ? 1
       : 0;
 
-  if (headerRowCount > 0) {
-    const headerRow = normalizedGrid[headerRowCount - 1] ?? [];
-    headers.push(...headerRow);
+  return {
+    merges,
+    tableRows,
+    normalizedGrid,
+    headerRowCount,
+    colCount,
+  };
+}
+
+function resolveHeaders(
+  table: HTMLTableElement,
+  parsedGrid: ReturnType<typeof buildParsedGrid>
+): string[] {
+  if (parsedGrid.headerRowCount > 0) {
+    return [...(parsedGrid.normalizedGrid[parsedGrid.headerRowCount - 1] ?? [])];
   }
 
-  normalizedGrid.forEach((rowData, index) => {
-    if (index < headerRowCount) {
-      return;
+  const headerTable = findLinkedHeaderTable(table, parsedGrid.colCount);
+  if (!headerTable) {
+    return [];
+  }
+
+  const headerGrid = buildParsedGrid(headerTable);
+  const fallbackHeaders =
+    headerGrid.normalizedGrid[headerGrid.headerRowCount - 1] ??
+    headerGrid.normalizedGrid[headerGrid.normalizedGrid.length - 1] ??
+    [];
+
+  return [...fallbackHeaders];
+}
+
+function findLinkedHeaderTable(
+  table: HTMLTableElement,
+  targetColCount: number
+): HTMLTableElement | null {
+  const primaryTable = findPrimaryTable(table);
+  const tableRoot = getElTableRoot(primaryTable ?? table);
+  const primaryHeader = tableRoot?.querySelector(
+    ':scope > .el-table__header-wrapper table.el-table__header'
+  ) as HTMLTableElement | null;
+  if (primaryHeader && primaryHeader !== table) {
+    return primaryHeader;
+  }
+
+  const allTables = Array.from(document.querySelectorAll('table'));
+  const currentIndex = allTables.indexOf(table);
+  const currentRect = table.getBoundingClientRect();
+
+  for (let index = currentIndex - 1; index >= 0 && index >= currentIndex - 4; index -= 1) {
+    const candidate = allTables[index];
+    if (!candidate) {
+      continue;
     }
 
-    if (rowData.length > 0 && rowData.some((cell) => cell.trim() !== '')) {
-      rows.push(rowData);
-      if (tableRows[index]) {
-        dataRowElements.push(tableRows[index]);
-      }
+    const candidateGrid = buildParsedGrid(candidate);
+    const candidateHasHeaders =
+      candidate.querySelector('thead') != null ||
+      candidate.querySelector('th') != null;
+    const candidateDataRows =
+      candidateGrid.normalizedGrid.length - candidateGrid.headerRowCount;
+
+    if (!candidateHasHeaders || candidateDataRows > 1 || candidateGrid.colCount === 0) {
+      continue;
     }
-  });
 
-  const caption = table.querySelector('caption');
-  const ariaLabel = table.getAttribute('aria-label');
-  const title =
-    caption?.textContent?.trim() ||
-    ariaLabel ||
-    findNearbyHeading(table) ||
-    sanitizeDocumentTitle(document.title) ||
-    `Table ${table.dataset.smartexcelTableId ?? 'unknown'}`;
+    if (targetColCount > 0 && Math.abs(candidateGrid.colCount - targetColCount) > 2) {
+      continue;
+    }
 
-  const hasCssRowNumbers = detectCssRowNumbers(table);
-  const cssRowNumbers = hasCssRowNumbers
-    ? extractCssRowNumbers(dataRowElements)
-    : [];
+    const candidateRect = candidate.getBoundingClientRect();
+    const isNearby =
+      Math.abs(candidateRect.left - currentRect.left) < 40 &&
+      Math.abs(candidateRect.width - currentRect.width) < 80;
 
-  return {
-    id: table.dataset.smartexcelTableId ?? 'table-unknown',
-    title,
-    headers,
-    rows,
-    merges,
-    element: table,
-    rowCount: rows.length,
-    colCount,
-    hasCssRowNumbers,
-    cssRowNumbers,
-  };
+    if (isNearby) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function findLinkedBodyTable(table: HTMLTableElement): HTMLTableElement | null {
+  const primaryTable = findPrimaryTable(table);
+  if (primaryTable && primaryTable !== table) {
+    return primaryTable;
+  }
+
+  const parsedGrid = buildParsedGrid(table);
+  const hasHeaders = table.querySelector('thead, th') != null;
+  const dataRowCount = parsedGrid.normalizedGrid.length - parsedGrid.headerRowCount;
+
+  if (!hasHeaders || dataRowCount > 1) {
+    return null;
+  }
+
+  const allTables = Array.from(document.querySelectorAll('table'));
+  const currentIndex = allTables.indexOf(table);
+  const currentRect = table.getBoundingClientRect();
+
+  for (let index = currentIndex + 1; index < allTables.length && index <= currentIndex + 4; index += 1) {
+    const candidate = allTables[index];
+    if (!candidate || !isMeaningfulTable(candidate)) {
+      continue;
+    }
+
+    const candidateGrid = buildParsedGrid(candidate);
+    const candidateHasOwnHeaders = candidate.querySelector('thead') != null;
+    const candidateRect = candidate.getBoundingClientRect();
+    const isNearby =
+      Math.abs(candidateRect.left - currentRect.left) < 40 &&
+      Math.abs(candidateRect.width - currentRect.width) < 80;
+
+    if (candidateHasOwnHeaders || !isNearby) {
+      continue;
+    }
+
+    if (candidateGrid.colCount > 0 && Math.abs(candidateGrid.colCount - parsedGrid.colCount) <= 2) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function findPrimaryTable(table: HTMLTableElement): HTMLTableElement | null {
+  const tableRoot = getElTableRoot(table);
+  if (!tableRoot) {
+    return null;
+  }
+
+  const mainBody = tableRoot.querySelector(
+    ':scope > .el-table__body-wrapper table.el-table__body'
+  ) as HTMLTableElement | null;
+
+  if (mainBody) {
+    return mainBody;
+  }
+
+  const mainHeader = tableRoot.querySelector(
+    ':scope > .el-table__header-wrapper table.el-table__header'
+  ) as HTMLTableElement | null;
+
+  return mainHeader;
+}
+
+function getElTableRoot(table: HTMLTableElement): HTMLElement | null {
+  return table.closest('.el-table');
+}
+
+function isFixedReplicaTable(table: HTMLTableElement): boolean {
+  return Boolean(table.closest('.el-table__fixed, .el-table__fixed-right'));
+}
+
+function isSplitHeaderTable(table: HTMLTableElement): boolean {
+  return findLinkedBodyTable(table) != null;
+}
+
+function isMeaningfulTable(table: HTMLTableElement): boolean {
+  const rows = Array.from(table.querySelectorAll('tr'));
+  if (rows.length === 0) {
+    return false;
+  }
+
+  const rect = table.getBoundingClientRect();
+  if (rect.width < 120 || rect.height < 40) {
+    return false;
+  }
+
+  const parsedGrid = buildParsedGrid(table);
+  const nonEmptyRows = parsedGrid.normalizedGrid.filter((row) =>
+    row.some((cell) => cell.trim() !== '')
+  );
+  const hasHeaders = table.querySelector('thead, th') != null;
+  const hasEnoughData = nonEmptyRows.length >= 2 && parsedGrid.colCount >= 2;
+
+  if (!hasHeaders && !hasEnoughData) {
+    return false;
+  }
+
+  const joinedText = nonEmptyRows
+    .flat()
+    .join(' ')
+    .trim();
+
+  if (!joinedText) {
+    return false;
+  }
+
+  const interactiveCount = table.querySelectorAll(
+    'button, input, select, textarea, a'
+  ).length;
+
+  return interactiveCount < Math.max(8, rows.length * 2);
 }
 
 function ensureStableTableId(table: HTMLTableElement): void {

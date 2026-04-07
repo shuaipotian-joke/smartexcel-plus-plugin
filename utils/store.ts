@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isExtensionContextValid } from './extension-runtime';
 import type { ParsedTable } from './table-parser';
 import { type Lang, detectBrowserLang } from './i18n';
 
@@ -28,9 +29,15 @@ export const useExtensionStore = create<ExtensionState>((set) => ({
   toggleEnabled: () => set((s) => ({ isEnabled: !s.isEnabled })),
   setLang: (lang) => {
     set({ lang });
-    browser.storage.local.set({ se_lang: lang });
+    if (!isExtensionContextValid()) {
+      return;
+    }
+    browser.storage.local.set({ se_lang: lang }).catch(() => undefined);
   },
   initLang: async () => {
+    if (!isExtensionContextValid()) {
+      return;
+    }
     const result = await browser.storage.local.get('se_lang');
     if (result.se_lang) {
       set({ lang: result.se_lang as Lang });

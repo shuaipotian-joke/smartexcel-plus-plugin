@@ -62,7 +62,9 @@ const zh = {
 
   // TableOverlay — toast messages
   exportedAs: '已导出为 {fmt}',
+  exportedWithCreditInfo: '已导出为 {fmt}，已扣除 {used} 积分，剩余 {n} 积分',
   creditsLeft: '，剩余 {n} 积分',
+  exportingPleaseWait: '请稍等，正在导出…',
   loginRequiredToExport: '导出前请先登录，新用户赠送 5 次',
   exportFailed: '导出失败，请重试',
   copiedToClipboard: '已复制到剪贴板',
@@ -117,7 +119,9 @@ const en: Record<TranslationKey, string> = {
   aiProcess: 'AI Processing',
 
   exportedAs: 'Exported as {fmt}',
+  exportedWithCreditInfo: 'Exported as {fmt}. {used} credit deducted, {n} credits left',
   creditsLeft: ', {n} credits left',
+  exportingPleaseWait: 'Please wait, exporting...',
   loginRequiredToExport: 'Please sign in before exporting. New users get 5 free exports',
   exportFailed: 'Export failed, please retry',
   copiedToClipboard: 'Copied to clipboard',

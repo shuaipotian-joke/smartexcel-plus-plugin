@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { ParsedTable } from './table-parser';
+import type { PreparedExportFile } from './messaging';
 
 export type ExportFormat = 'xlsx' | 'csv';
 
@@ -44,6 +45,26 @@ export function exportMultipleTables(
   XLSX.writeFile(workbook, `${sanitizeFileName(fileName)}.xlsx`, { bookType: 'xlsx' });
 }
 
+export function prepareExportFile(
+  table: ParsedTable,
+  options: ExportOptions = {},
+): PreparedExportFile {
+  const { format = 'xlsx', withIndex = false } = options;
+  const worksheet = buildWorksheet(table, withIndex);
+  const workbook = XLSX.utils.book_new();
+  const sheetName = sanitizeSheetName(table.title);
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+  const fileName = `${sanitizeFileName(table.title || table.id)}.${format}`;
+  const mimeType =
+    format === 'csv'
+      ? 'text/csv;charset=utf-8'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const base64 = XLSX.write(workbook, { bookType: format, type: 'base64' });
+
+  return { fileName, mimeType, base64 };
+}
+
 export function copyTableToClipboard(
   table: ParsedTable,
   withIndex = false,
@@ -71,7 +92,12 @@ function buildSheetData(table: ParsedTable, withIndex: boolean): string[][] {
 }
 
 function buildWorksheet(table: ParsedTable, withIndex: boolean): XLSX.WorkSheet {
-  if (!withIndex) {
+  const shouldUseParsedData =
+    withIndex ||
+    table.headers.length > 0 ||
+    table.rows.length > 0;
+
+  if (!shouldUseParsedData) {
     const clonedTable = table.element.cloneNode(true) as HTMLTableElement;
     const worksheet = XLSX.utils.table_to_sheet(clonedTable, {
       raw: false,

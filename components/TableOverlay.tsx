@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { parseTable, type ParsedTable } from '@/utils/table-parser';
+import {
+  getLogicalTable,
+  getLogicalTableBounds,
+  parseTable,
+  type ParsedTable,
+} from '@/utils/table-parser';
+import {
+  isExtensionContextValid,
+  safeAddStorageChangedListener,
+  safeSendRuntimeMessage,
+} from '@/utils/extension-runtime';
 import { exportToExcel } from '@/utils/excel-export';
 import { useExtensionStore } from '@/utils/store';
 import { t, type Lang } from '@/utils/i18n';
@@ -12,20 +22,18 @@ type CreditCheckResult = {
 };
 
 async function requestCheckAndConsume(): Promise<CreditCheckResult> {
-  try {
-    return await browser.runtime.sendMessage({ type: 'CHECK_AND_CONSUME' });
-  } catch {
-    // Fallback if background not available
-    return { allowed: false, reason: 'error', isLoggedIn: false };
-  }
+  const result = await safeSendRuntimeMessage<CreditCheckResult>({
+    type: 'CHECK_AND_CONSUME',
+  });
+  return result ?? { allowed: false, reason: 'error', isLoggedIn: false };
 }
 
 function openLoginPage() {
-  browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
+  void safeSendRuntimeMessage({ type: 'OPEN_LOGIN' });
 }
 
 function openPaymentPage() {
-  browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
+  void safeSendRuntimeMessage({ type: 'OPEN_PAYMENT_PAGE' });
 }
 
 interface FloatingButton {
@@ -35,9 +43,33 @@ interface FloatingButton {
   table: ParsedTable | null;
 }
 
+const FAB_SIZE = 34;
+const FAB_MARGIN = 12;
+const HEADER_OFFSET = 4;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getVisibleFabX(bounds: { left: number; right: number }) {
+  const viewportLeft = 0;
+  const viewportRight = window.innerWidth;
+  const visibleLeft = Math.max(bounds.left, viewportLeft);
+  const visibleRight = Math.min(bounds.right, viewportRight);
+
+  // When a wide table overflows horizontally, anchor the button to the
+  // visible portion instead of the table's absolute right edge.
+  const anchorRight = visibleRight > visibleLeft ? visibleRight : viewportRight;
+  const minX = FAB_MARGIN;
+  const maxX = Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN);
+
+  return clamp(anchorRight - FAB_SIZE - FAB_MARGIN, minX, maxX);
+}
+
 export default function TableOverlay() {
   const isEnabled = useExtensionStore((s) => s.isEnabled);
   const lang = useExtensionStore((s) => s.lang);
+  const [contextValid, setContextValid] = useState(() => isExtensionContextValid());
   const [fab, setFab] = useState<FloatingButton>({
     visible: false,
     x: 0,
@@ -56,34 +88,71 @@ export default function TableOverlay() {
 
   // Load saved lang preference and watch for changes made in the popup
   useEffect(() => {
+    if (!isExtensionContextValid()) {
+      setContextValid(false);
+      return;
+    }
+
     useExtensionStore.getState().initLang();
     const handler = (changes: Record<string, { newValue?: unknown }>) => {
       if (changes.se_lang?.newValue) {
         useExtensionStore.setState({ lang: changes.se_lang.newValue as Lang });
       }
     };
-    browser.storage.onChanged.addListener(handler);
-    return () => browser.storage.onChanged.removeListener(handler);
+    return safeAddStorageChangedListener(handler);
   }, []);
 
   useEffect(() => {
-    if (!isEnabled) return;
+    const interval = window.setInterval(() => {
+      const valid = isExtensionContextValid();
+      setContextValid(valid);
+      if (!valid) {
+        setMenuOpen(false);
+        setFab((prev) => ({ ...prev, visible: false }));
+      }
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleToastEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      if (detail?.message) {
+        showToast(detail.message);
+      }
+    };
+
+    window.addEventListener('smartexcel:toast', handleToastEvent as EventListener);
+    return () => {
+      window.removeEventListener('smartexcel:toast', handleToastEvent as EventListener);
+    };
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!isEnabled || !contextValid) return;
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      const table = target.closest('table') as HTMLTableElement | null;
-      if (!table) return;
+      const hoveredTable = target.closest('table') as HTMLTableElement | null;
+      if (!hoveredTable) return;
+
+      const table = getLogicalTable(hoveredTable);
 
       clearTimeout(hideTimer.current);
 
-      const rect = table.getBoundingClientRect();
+      const rect = getLogicalTableBounds(table);
       const parsed = parseTable(table);
       if (parsed.rowCount === 0 && parsed.headers.length === 0) return;
 
+      const minX = FAB_MARGIN;
+      const minY = FAB_MARGIN;
+      const maxY = Math.max(FAB_MARGIN, window.innerHeight - FAB_SIZE - FAB_MARGIN);
+
       setFab({
         visible: true,
-        x: rect.right - 40,
-        y: rect.top + 4,
+        x: getVisibleFabX(rect),
+        y: clamp(rect.top + HEADER_OFFSET, minY, maxY),
         table: parsed,
       });
     };
@@ -121,7 +190,12 @@ export default function TableOverlay() {
 
   const handleExport = useCallback(
     async (format: 'xlsx' | 'csv') => {
-      if (!fab.table) return;
+      if (!fab.table || !isExtensionContextValid()) {
+        setContextValid(false);
+        setMenuOpen(false);
+        setFab((prev) => ({ ...prev, visible: false }));
+        return;
+      }
       setMenuOpen(false);
 
       // 向后台请求积分检查并扣除
@@ -152,7 +226,7 @@ export default function TableOverlay() {
     [fab.table, lang, showToast],
   );
 
-  if (!fab.visible || !isEnabled) return null;
+  if (!fab.visible || !isEnabled || !contextValid) return null;
 
   return (
     <>

@@ -1,7 +1,14 @@
 import ReactDOM from 'react-dom/client';
 import TableOverlay from '@/components/TableOverlay';
-import { detectTables, parseTable } from '@/utils/table-parser';
-import { exportToExcel, exportMultipleTables, copyTableToClipboard } from '@/utils/excel-export';
+import { safeSendRuntimeMessage } from '@/utils/extension-runtime';
+import { detectTables, getLogicalTable, parseTable } from '@/utils/table-parser';
+import {
+  exportToExcel,
+  exportMultipleTables,
+  copyTableToClipboard,
+  prepareExportFile,
+} from '@/utils/excel-export';
+import { t, detectBrowserLang } from '@/utils/i18n';
 import '@/assets/styles/tailwind.css';
 
 type CreditCheckResult = {
@@ -14,15 +21,54 @@ type CreditCheckResult = {
 
 type ExportAccessResult = CreditCheckResult & { openedFlow?: 'login' | 'payment' };
 
-async function requestCheckAndConsume(amount = 1): Promise<CreditCheckResult> {
-  try {
-    return await browser.runtime.sendMessage({
-      type: 'CHECK_AND_CONSUME',
-      payload: { amount },
-    });
-  } catch {
-    return { allowed: false, reason: 'error', isLoggedIn: false };
+let toastHost: HTMLDivElement | null = null;
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let lastContextTable: HTMLTableElement | null = null;
+
+function showPageToast(message: string, duration = 2200) {
+  if (!toastHost) {
+    toastHost = document.createElement('div');
+    toastHost.style.position = 'fixed';
+    toastHost.style.left = '50%';
+    toastHost.style.bottom = '24px';
+    toastHost.style.transform = 'translateX(-50%)';
+    toastHost.style.zIndex = '2147483647';
+    toastHost.style.background = '#1a73f5';
+    toastHost.style.color = '#fff';
+    toastHost.style.padding = '10px 24px';
+    toastHost.style.borderRadius = '10px';
+    toastHost.style.fontSize = '14px';
+    toastHost.style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
+    toastHost.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    toastHost.style.whiteSpace = 'nowrap';
+    toastHost.style.pointerEvents = 'none';
+    toastHost.style.opacity = '0';
+    toastHost.style.transition = 'opacity 160ms ease';
+    document.documentElement.appendChild(toastHost);
   }
+
+  toastHost.textContent = `✓ ${message}`;
+  toastHost.style.opacity = '1';
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+
+  if (duration > 0) {
+    toastTimer = setTimeout(() => {
+      if (toastHost) {
+        toastHost.style.opacity = '0';
+      }
+    }, duration);
+  }
+}
+
+async function requestCheckAndConsume(amount = 1): Promise<CreditCheckResult> {
+  const result = await safeSendRuntimeMessage<CreditCheckResult>({
+    type: 'CHECK_AND_CONSUME',
+    payload: { amount },
+  });
+  return result ?? { allowed: false, reason: 'error', isLoggedIn: false };
 }
 
 async function ensureExportAccess(amount = 1): Promise<ExportAccessResult> {
@@ -32,11 +78,11 @@ async function ensureExportAccess(amount = 1): Promise<ExportAccessResult> {
   }
 
   if (result.reason === 'not_logged_in') {
-    await browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
+    await safeSendRuntimeMessage({ type: 'OPEN_LOGIN' });
     return { ...result, openedFlow: 'login' };
   }
 
-  await browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
+  await safeSendRuntimeMessage({ type: 'OPEN_PAYMENT_PAGE' });
   return { ...result, openedFlow: 'payment' };
 }
 
@@ -51,11 +97,44 @@ function findTableById(
   return tables.find((table) => table.dataset.smartexcelTableId === tableId);
 }
 
+function resolveContextTable(
+  tables: HTMLTableElement[],
+  tableId?: string
+): HTMLTableElement | undefined {
+  if (lastContextTable && document.contains(lastContextTable)) {
+    const contextTable = getLogicalTable(lastContextTable);
+    const parsedContextId = parseTable(contextTable).id;
+    if (!tableId || parsedContextId === tableId) {
+      return contextTable;
+    }
+  }
+
+  return findTableById(tables, tableId);
+}
+
+function isHeaderContext(target: HTMLElement | null, table: HTMLTableElement | null): boolean {
+  if (!target || !table) {
+    return false;
+  }
+
+  if (target.closest('th')) {
+    return true;
+  }
+
+  if (table.classList.contains('el-table__header')) {
+    return true;
+  }
+
+  return Boolean(target.closest('.el-table__header-wrapper'));
+}
+
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
+  allFrames: true,
   cssInjectionMode: 'ui',
 
   async main(ctx) {
+    const lang = detectBrowserLang();
     const ui = await createShadowRootUi(ctx, {
       name: 'smartexcel-overlay',
       position: 'overlay',
@@ -77,30 +156,49 @@ export default defineContentScript({
     // Relay postMessage from smartexcel.app pages (e.g. plugin-payment after payment success)
     window.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type === 'SE_PLUGIN_AUTH' && e.data?.data) {
-        browser.runtime.sendMessage({ type: 'PLUGIN_AUTH_SYNC', data: e.data.data });
+        void safeSendRuntimeMessage({ type: 'PLUGIN_AUTH_SYNC', data: e.data.data });
       }
 
       if (e.data?.type === 'SE_PLUGIN_SYNC' && e.data?.data) {
-        browser.runtime.sendMessage({ type: 'PLUGIN_SYNC', data: e.data.data });
+        void safeSendRuntimeMessage({ type: 'PLUGIN_SYNC', data: e.data.data });
       }
 
       if (e.data?.type === 'SE_PLUGIN_LOGOUT') {
-        browser.runtime.sendMessage({ type: 'CLEAR_PLUGIN_SESSION' });
+        void safeSendRuntimeMessage({ type: 'CLEAR_PLUGIN_SESSION' });
       }
     });
+
+    const reportContextTarget = (target: HTMLElement | null) => {
+      const hoveredTable = target?.closest('table') as HTMLTableElement | null;
+      const table = hoveredTable ? getLogicalTable(hoveredTable) : null;
+      const headerContext = isHeaderContext(target, hoveredTable);
+      lastContextTable = table;
+
+      void safeSendRuntimeMessage({
+        type: 'SET_CONTEXT_TABLE',
+        payload: {
+          tableId: table ? parseTable(table).id : null,
+          isHeaderContext: headerContext,
+        },
+      });
+    };
+
+    document.addEventListener(
+      'mousedown',
+      (event: MouseEvent) => {
+        if (event.button !== 2) {
+          return;
+        }
+
+        reportContextTarget(event.target as HTMLElement | null);
+      },
+      true,
+    );
 
     document.addEventListener(
       'contextmenu',
       (event: MouseEvent) => {
-        const target = event.target as HTMLElement | null;
-        const table = target?.closest('table') as HTMLTableElement | null;
-
-        browser.runtime.sendMessage({
-          type: 'SET_CONTEXT_TABLE',
-          payload: {
-            tableId: table ? parseTable(table).id : null,
-          },
-        }).catch(() => undefined);
+        reportContextTarget(event.target as HTMLElement | null);
       },
       true,
     );
@@ -184,22 +282,71 @@ export default defineContentScript({
 
         case 'EXPORT_CONTEXT_TABLE': {
           void (async () => {
-            const access = await ensureExportAccess(1);
-            if (!access.allowed) {
-              sendResponse({ ok: false, reason: access.reason });
-              return;
+            const { format, tableId, skipAccessCheck } = message.payload ?? {};
+            if (!skipAccessCheck) {
+              const access = await ensureExportAccess(1);
+              if (!access.allowed) {
+                sendResponse({ ok: false, reason: access.reason });
+                return;
+              }
             }
 
-            const { format, tableId } = message.payload ?? {};
-            const table = findTableById(tables, tableId);
+            const table = resolveContextTable(tables, tableId);
             if (!table) {
               sendResponse({ ok: false, reason: 'table_not_found' });
               return;
             }
 
-            exportToExcel(parseTable(table), { format });
-            sendResponse({ ok: true });
+            try {
+              exportToExcel(parseTable(table), { format });
+              sendResponse({ ok: true });
+            } catch (error) {
+              console.error('context export failed:', error);
+              showPageToast(t('exportFailed', lang));
+              sendResponse({ ok: false, reason: 'export_failed' });
+            }
           })();
+          break;
+        }
+
+        case 'PREPARE_CONTEXT_EXPORT': {
+          void (async () => {
+            const { format, tableId } = message.payload ?? {};
+            const table = resolveContextTable(tables, tableId);
+            if (!table) {
+              sendResponse({ ok: false, reason: 'table_not_found' });
+              return;
+            }
+
+            try {
+              const file = prepareExportFile(parseTable(table), { format });
+              sendResponse({ ok: true, file });
+            } catch (error) {
+              console.error('prepare context export failed:', error);
+              showPageToast(t('exportFailed', lang));
+              sendResponse({ ok: false, reason: 'export_failed' });
+            }
+          })();
+          break;
+        }
+
+        case 'SHOW_EXPORT_FEEDBACK': {
+          const { format, remaining, used = 1 } = message.payload ?? {};
+          const fmt = (format ?? 'xlsx').toUpperCase();
+          const messageText =
+            remaining !== undefined
+              ? t('exportedWithCreditInfo', lang, { fmt, used, n: remaining })
+              : t('exportedAs', lang, { fmt });
+          showPageToast(messageText);
+          sendResponse({ ok: true });
+          break;
+        }
+
+        case 'SHOW_EXPORT_PROGRESS': {
+          const messageText =
+            message.payload?.message || t('exportingPleaseWait', lang);
+          showPageToast(messageText, 0);
+          sendResponse({ ok: true });
           break;
         }
       }
