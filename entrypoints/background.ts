@@ -1,10 +1,10 @@
 const SMARTEXCEL_URL =
   import.meta.env.WXT_SMARTEXCEL_URL || 'http://localhost:3000';
 const PLUGIN_BRIDGE_URL = `${SMARTEXCEL_URL}/plugin-auth/bridge`;
-const PLUGIN_ME_URL = `${SMARTEXCEL_URL}/api/plugin/auth/me`;
-const PLUGIN_CONSUME_URL = `${SMARTEXCEL_URL}/api/plugin/consume`;
-const PLUGIN_CREATE_LOGIN_TICKET_URL = `${SMARTEXCEL_URL}/api/plugin/auth/create-login-ticket`;
-const PLUGIN_REVOKE_URL = `${SMARTEXCEL_URL}/api/plugin/auth/revoke`;
+const PLUGIN_ME_URL = `${SMARTEXCEL_URL}/v1/plugin/auth/me`;
+const PLUGIN_CONSUME_URL = `${SMARTEXCEL_URL}/v1/plugin/consume`;
+const PLUGIN_CREATE_LOGIN_TICKET_URL = `${SMARTEXCEL_URL}/v1/plugin/auth/create-login-ticket`;
+const PLUGIN_REVOKE_URL = `${SMARTEXCEL_URL}/v1/plugin/auth/revoke`;
 const CONTENT_SCRIPT_PATH = 'content-scripts/content.js';
 const CONTEXT_MENU_ROOT_ID = 'smartexcel-context-root';
 const CONTEXT_MENU_EXPORT_XLSX_ID = 'smartexcel-context-export-xlsx';
