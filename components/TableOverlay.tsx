@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { ReactNode } from 'react';
 import {
   getLogicalTable,
   getLogicalTableBounds,
@@ -13,6 +14,7 @@ import {
 import { exportToExcel } from '@/utils/excel-export';
 import { useExtensionStore } from '@/utils/store';
 import { t, type Lang } from '@/utils/i18n';
+import { Check, ChevronDown, FileSpreadsheet, Table2 } from 'lucide-react';
 
 type CreditCheckResult = {
   allowed: boolean;
@@ -43,9 +45,19 @@ interface FloatingButton {
   table: ParsedTable | null;
 }
 
-const FAB_SIZE = 34;
+const FAB_SIZE = 38;
 const FAB_MARGIN = 12;
 const HEADER_OFFSET = 4;
+const palette = {
+  ink: '#173127',
+  muted: '#557064',
+  faint: '#6d8277',
+  primary: '#1f966b',
+  primaryDark: '#1d7858',
+  primarySoft: '#d9f5e8',
+  cream: '#fffdf7',
+  line: '#d9e7d8',
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -251,65 +263,98 @@ export default function TableOverlay() {
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '8px',
-            backgroundColor: '#1a73f5',
-            border: 'none',
+            width: `${FAB_SIZE}px`,
+            height: `${FAB_SIZE}px`,
+            borderRadius: '12px',
+            background:
+              'linear-gradient(135deg, #2ab37f 0%, #1f966b 100%)',
+            border: '1px solid rgba(255,255,255,0.75)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 12px rgba(26,115,245,0.4)',
-            transition: 'transform 0.15s, box-shadow 0.15s',
+            boxShadow:
+              '0 18px 38px -18px rgba(24,79,62,0.58), 0 0 0 4px rgba(217,245,232,0.82)',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
             pointerEvents: 'auto',
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'scale(1.12)';
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(26,115,245,0.5)';
+            e.currentTarget.style.transform = 'translateY(-1px) scale(1.08)';
+            e.currentTarget.style.boxShadow =
+              '0 24px 44px -18px rgba(24,79,62,0.68), 0 0 0 5px rgba(217,245,232,0.95)';
           }}
           onMouseOut={(e) => {
             e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 2px 12px rgba(26,115,245,0.4)';
+            e.currentTarget.style.boxShadow =
+              '0 18px 38px -18px rgba(24,79,62,0.58), 0 0 0 4px rgba(217,245,232,0.82)';
           }}
           title={t('exportTableTitle', lang)}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="8" y1="13" x2="16" y2="13" />
-            <line x1="8" y1="17" x2="16" y2="17" />
-            <line x1="10" y1="9" x2="8" y2="9" />
-          </svg>
+          <FileSpreadsheet size={19} color="#fff" strokeWidth={2.3} />
         </button>
 
         {menuOpen && (
           <div
             style={{
               position: 'absolute',
-              top: '38px',
+              top: '46px',
               right: '0',
-              width: '220px',
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
-              border: '1px solid #e5e7eb',
+              width: '238px',
+              background:
+                'linear-gradient(180deg, rgba(255,253,247,0.98) 0%, rgba(255,255,255,0.98) 100%)',
+              borderRadius: '14px',
+              boxShadow:
+                '0 28px 78px -42px rgba(24,79,62,0.45), 0 10px 24px -18px rgba(24,79,62,0.24)',
+              border: `1px solid ${palette.line}`,
               overflow: 'hidden',
               animation: 'smartexcel-fadein 0.15s ease',
               pointerEvents: 'auto',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontFamily:
+                'Aptos, "Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif',
             }}
           >
             {/* Table info */}
             <div style={{
-              padding: '10px 14px', backgroundColor: '#f9fafb',
-              borderBottom: '1px solid #e5e7eb', fontSize: '12px', color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '9px',
+              padding: '12px 14px',
+              backgroundColor: '#f1fbf6',
+              borderBottom: `1px solid ${palette.line}`,
+              fontSize: '12px',
+              color: palette.muted,
             }}>
-              📋 {fab.table ? t('rowsCols', lang, { r: fab.table.rowCount, c: fab.table.colCount }) : ''}
+              <span style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#fff',
+                color: palette.primary,
+                boxShadow: '0 8px 18px -14px rgba(24,79,62,0.42)',
+              }}>
+                <Table2 size={15} />
+              </span>
+              <span style={{ fontWeight: 600 }}>
+                {fab.table ? t('rowsCols', lang, { r: fab.table.rowCount, c: fab.table.colCount }) : ''}
+              </span>
             </div>
 
-            <MenuItem icon="📊" label={t('exportAsExcel', lang)} sublabel=".xlsx" onClick={() => handleExport('xlsx')} />
-            <MenuItem icon="📄" label={t('exportAsCsv', lang)} sublabel=".csv" onClick={() => handleExport('csv')} />
+            <MenuItem
+              icon={<FileSpreadsheet size={16} />}
+              label={t('exportAsExcel', lang)}
+              sublabel=".xlsx"
+              primary
+              onClick={() => handleExport('xlsx')}
+            />
+            <MenuItem
+              icon={<Table2 size={16} />}
+              label={t('exportAsCsv', lang)}
+              sublabel=".csv"
+              onClick={() => handleExport('csv')}
+            />
           </div>
         )}
       </div>
@@ -317,13 +362,15 @@ export default function TableOverlay() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          backgroundColor: '#1a73f5', color: '#fff', padding: '10px 24px',
-          borderRadius: '10px', fontSize: '14px', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          backgroundColor: palette.ink, color: '#fff', padding: '10px 18px',
+          borderRadius: '12px', fontSize: '13px', boxShadow: '0 24px 54px -34px rgba(24,79,62,0.58)',
           zIndex: 2147483647, animation: 'smartexcel-fadein 0.2s ease',
-          pointerEvents: 'auto', fontFamily: 'system-ui, -apple-system, sans-serif',
+          pointerEvents: 'auto', fontFamily: 'Aptos, "Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif',
           whiteSpace: 'nowrap',
         }}>
-          ✓ {toast}
+          <Check size={15} color="#82dbb9" strokeWidth={2.4} />
+          <span>{toast}</span>
         </div>
       )}
 
@@ -337,10 +384,11 @@ export default function TableOverlay() {
   );
 }
 
-function MenuItem({ icon, label, sublabel, onClick }: {
-  icon: string;
+function MenuItem({ icon, label, sublabel, primary, onClick }: {
+  icon: ReactNode;
   label: string;
   sublabel?: string;
+  primary?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -349,17 +397,32 @@ function MenuItem({ icon, label, sublabel, onClick }: {
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
         padding: '10px 14px', backgroundColor: 'transparent', border: 'none',
-        cursor: 'pointer', fontSize: '13px', color: '#374151',
+        cursor: 'pointer', fontSize: '13px', color: palette.ink,
         transition: 'background-color 0.12s', textAlign: 'left',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: 'Aptos, "Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif',
         pointerEvents: 'auto',
       }}
-      onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
+      onMouseOver={(e) => { e.currentTarget.style.backgroundColor = primary ? '#d9f5e8' : '#f1fbf6'; }}
       onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
     >
-      <span style={{ fontSize: '16px', lineHeight: 1 }}>{icon}</span>
-      <span style={{ flex: 1 }}>{label}</span>
-      {sublabel && <span style={{ fontSize: '11px', color: '#9ca3af' }}>{sublabel}</span>}
+      <span
+        style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '8px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: primary ? palette.primarySoft : '#fffdf7',
+          color: primary ? palette.primaryDark : palette.muted,
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ flex: 1, fontWeight: 600 }}>{label}</span>
+      {sublabel && <span style={{ fontSize: '11px', color: palette.faint }}>{sublabel}</span>}
+      <ChevronDown size={13} color={palette.faint} style={{ transform: 'rotate(-90deg)' }} />
     </button>
   );
 }

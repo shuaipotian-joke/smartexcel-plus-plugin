@@ -1,96 +1,132 @@
 # SmartExcel Plugin
 
-智能识别网页表格，一键导出为 Excel 文件的浏览器扩展。
+SmartExcel Plugin is an open-source browser extension that detects HTML tables on web pages and exports them to Excel-compatible files.
 
-## 功能
+It is designed as the browser-extension companion to the SmartExcel website. The extension can work as a table export tool, and it also integrates with the website for plugin login, credit balance, payment entry, and credit synchronization.
 
-- **自动识别** — 自动检测页面中所有 `<table>` 元素
-- **悬停提示** — 鼠标移到表格上显示导出浮动按钮
-- **多格式导出** — 支持 `.xlsx` / `.csv` 格式
-- **一键复制** — 复制表格数据到剪贴板
-- **批量导出** — 一次导出页面所有表格
-- **AI 联动** — 发送表格到 SmartExcel 网站进行 AI 处理
+## What It Does
 
-## 技术栈
+- Detects HTML tables on any web page.
+- Shows a floating SmartExcel export button when the user hovers over a table.
+- Exports a single table as `.xlsx` or `.csv`.
+- Exports all detected tables from the popup.
+- Preserves table headers and structured cell data where possible.
+- Checks login, free quota, and credit balance before paid export flows.
+- Opens the SmartExcel website for login, registration, and credit purchase flows.
+- Syncs plugin authentication and credit state from the website.
+- Displays the popup language from the user's browser region by default, with manual language switching in settings.
 
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| WXT | 0.19+ | 跨浏览器扩展框架 |
-| React | 19 | UI 组件 |
-| TypeScript | 5.6+ | 类型安全 |
-| Tailwind CSS | 3.4 | 样式 |
-| Zustand | 5 | 状态管理 |
-| SheetJS | 0.20+ | Excel 导出引擎 |
-| Vite | 6 (WXT 内置) | 构建工具 |
+## Browser Support
 
-## 支持浏览器
+| Browser | Manifest | Status |
+| --- | --- | --- |
+| Chrome | MV3 | Supported |
+| Edge | MV3 | Supported |
+| Firefox | MV2/MV3 through WXT | Supported |
+| Safari | MV2/MV3 through WXT | Experimental |
+| Brave / Arc / Opera | MV3 | Compatible with Chromium builds |
 
-| 浏览器 | Manifest | 状态 |
-|--------|----------|------|
-| Chrome | V3 | ✅ |
-| Edge | V3 | ✅ |
-| Firefox | V2/V3 | ✅ |
-| Safari | V2/V3 | ✅ |
-| Opera | V3 | ✅ |
-| Brave / Arc | V3 | ✅ |
+## Project Roles
 
-## 开发
+| Path | Role |
+| --- | --- |
+| `entrypoints/background.ts` | Runtime coordinator for login state, credits, free limits, payment redirects, context-menu actions, and extension messages. |
+| `entrypoints/content.tsx` | Content script that runs on web pages, detects tables, handles page-level export actions, and mounts the floating table overlay. |
+| `entrypoints/popup/App.tsx` | Main popup panel that lists detected tables, displays account or credit state, and starts export/login/payment actions. |
+| `entrypoints/popup/SettingsPanel.tsx` | Popup settings screen for language, account state, login, registration, and logout controls. |
+| `components/TableOverlay.tsx` | Floating in-page SmartExcel button and export menu shown next to hovered tables. |
+| `utils/table-parser.ts` | HTML table detection and parsing logic. |
+| `utils/excel-export.ts` | SheetJS-based file generation for Excel and CSV exports. |
+| `utils/messaging.ts` | Message contract types shared by popup, content script, and background worker. |
+| `utils/store.ts` | Zustand state for extension UI settings such as enabled state and language. |
+| `utils/i18n.ts` | Chinese/English translations and region-aware default language detection. |
+| `utils/extension-runtime.ts` | Safe runtime helpers for extension-context checks and messaging. |
+| `utils/ensure-content-script.ts` | Helper used by the popup to make sure the active tab can receive content-script messages. |
+| `tailwind.config.ts` | Extension theme tokens aligned with the SmartExcel website visual style. |
+| `wxt.config.ts` | WXT extension configuration, manifest metadata, permissions, and browser build setup. |
+
+## Design Direction
+
+The extension UI follows the SmartExcel website style:
+
+- warm off-white surfaces;
+- green SmartExcel brand accents;
+- soft borders and shadows;
+- compact shadcn-style controls;
+- simple lucide icons;
+- restrained motion and hover states.
+
+## Language Behavior
+
+The popup and overlay support Chinese and English.
+
+By default, the extension detects the user's browser locale and regional hints. Chinese-speaking locales and common Chinese-region time zones show Chinese. Other regions fall back to English. Users can override the language in the popup settings panel.
+
+## Development
+
+Use `npm` in this repository.
 
 ```bash
-# 安装依赖
 npm install
-
-# 开发模式 (Chrome)
 npm run dev
-
-# 开发模式 (Firefox)
-npm run dev:firefox
-
-# 开发模式 (Edge)
-npm run dev:edge
 ```
 
-## 构建
+Browser-specific development:
 
 ```bash
-# 构建 Chrome 版本
+npm run dev:edge
+npm run dev:firefox
+```
+
+## Build
+
+```bash
+# Chrome MV3 build
 npm run build
 
-# 构建 Firefox 版本
+# Edge MV3 build
+npm run build:edge
+
+# Firefox build
 npm run build:firefox
 
-# 构建所有浏览器版本
+# All browser builds
 npm run build:all
+```
 
-# 打包所有浏览器版本为 zip
+Build outputs are written to `.output/`.
+
+For real QA, load the unpacked extension from `.output/chrome-mv3/` or `.output/edge-mv3/` and test on pages with real HTML tables.
+
+## Release Archives
+
+```bash
+npm run zip
+npm run zip:edge
+npm run zip:firefox
 npm run zip:all
 ```
 
-## 项目结构
+## Repository Layout
 
-```
+```text
 smartexcel-plugin/
-├── entrypoints/          # WXT 入口文件
-│   ├── background.ts     # Service Worker
-│   ├── content.tsx        # 内容脚本 (表格检测)
-│   └── popup/             # 弹窗 UI
-│       ├── index.html
-│       ├── main.tsx
-│       └── App.tsx
-├── components/            # React 组件
-│   └── TableOverlay.tsx   # 表格悬浮覆盖层
-├── utils/                 # 工具函数
-│   ├── excel-export.ts    # Excel 导出逻辑
-│   ├── table-parser.ts    # 表格解析器
-│   ├── messaging.ts       # 消息通信
-│   └── store.ts           # Zustand 状态管理
-├── assets/styles/         # 样式文件
-├── public/                # 静态资源
-├── wxt.config.ts          # WXT 配置
-├── tailwind.config.ts     # Tailwind 配置
-└── tsconfig.json          # TypeScript 配置
+├── assets/styles/          # Tailwind entry styles
+├── components/             # Shared React components
+├── entrypoints/            # WXT background, content, and popup entrypoints
+├── public/                 # Extension icons and static assets
+├── utils/                  # Export, parsing, messaging, i18n, and store helpers
+├── wxt.config.ts           # Extension manifest and WXT config
+├── tailwind.config.ts      # Theme tokens
+└── package.json            # Scripts and dependencies
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. Please keep changes focused and run the relevant build command before opening a PR.
+
+For changes involving plugin credits, login redirects, payment entry, or website sync, validate the sibling SmartExcel website repo as well because those flows depend on both projects.
 
 ## License
 
-MIT
+MIT License. See [LICENSE](./LICENSE).

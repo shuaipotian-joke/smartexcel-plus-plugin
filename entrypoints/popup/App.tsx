@@ -3,6 +3,13 @@ import type { TableInfo } from '@/utils/messaging';
 import { useExtensionStore } from '@/utils/store';
 import { t, type Lang } from '@/utils/i18n';
 import { ensureContentScript } from '@/utils/ensure-content-script';
+import {
+  FileSpreadsheet,
+  Loader2,
+  Settings,
+  Sparkles,
+  Table2,
+} from 'lucide-react';
 import SettingsPanel from './SettingsPanel';
 
 type CreditState = {
@@ -166,42 +173,42 @@ export default function App() {
   }
 
   return (
-    <div className="w-[360px] min-h-[200px] bg-white">
+    <div className="w-[380px] min-h-[260px] overflow-hidden bg-cream-50 text-[#173127]">
       {/* Header */}
-      <div className="bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-3 flex items-center gap-3">
-        <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="8" y1="13" x2="16" y2="13" />
-            <line x1="8" y1="17" x2="16" y2="17" />
-          </svg>
+      <div className="relative border-b border-cream-200 bg-[radial-gradient(circle_at_top_left,rgba(42,179,127,0.18),transparent_36%),linear-gradient(135deg,#fffdf7_0%,#f1fbf6_100%)] px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/85 shadow-soft">
+            <img src="/icon-128.png" alt="" className="h-7 w-7 rounded-lg" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base font-semibold tracking-tight text-[#173127]">
+              SmartExcel
+            </h1>
+            <p className="mt-0.5 text-xs text-[#557064]">{t('appSubtitle', lang)}</p>
+          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d9e7d8] bg-white/80 text-[#557064] shadow-sm transition-all hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+            title={t('settings', lang)}
+          >
+            <Settings className="h-4 w-4" />
+          </button>
         </div>
-        <div className="flex-1">
-          <h1 className="text-white font-semibold text-sm">SmartExcel</h1>
-          <p className="text-white/70 text-xs">{t('appSubtitle', lang)}</p>
-        </div>
-        {/* Settings button */}
-        <button
-          onClick={() => setShowSettings(true)}
-          className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors"
-          title={t('settings', lang)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
       </div>
 
       {/* Credit info bar */}
       {creditState && (
-        <div className="px-4 py-2 bg-brand-50 border-b border-brand-100 flex items-center justify-between">
-          <span className="text-xs text-brand-700 font-medium">
-            {getRemainingText()}
-          </span>
+        <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-brand-100 bg-white/80 px-3 py-2.5 shadow-soft">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
+              <Sparkles className="h-3.5 w-3.5" />
+            </span>
+            <span className="truncate text-xs font-medium text-[#305246]">
+              {getRemainingText()}
+            </span>
+          </div>
           <button
-            className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full hover:bg-brand-700 transition-colors font-medium"
+            className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
             onClick={creditState.loggedIn ? handleAddCredits : handleLogin}
           >
             {creditState.loggedIn ? t('addCredits', lang) : t('login', lang)}
@@ -210,7 +217,7 @@ export default function App() {
       )}
 
       {actionMessage && (
-        <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm">
           <span>{actionMessage.text}</span>{' '}
           {actionMessage.showBuy && (
             <button
@@ -227,23 +234,25 @@ export default function App() {
       <div className="p-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
           </div>
         ) : tables.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-3">📊</div>
-            <p className="text-gray-500 text-sm">{t('noTablesFound', lang)}</p>
-            <p className="text-gray-400 text-xs mt-1">{t('hoverHint', lang)}</p>
+          <div className="rounded-2xl border border-dashed border-[#d9e7d8] bg-white/70 px-5 py-9 text-center shadow-soft">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+              <Table2 className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-medium text-[#305246]">{t('noTablesFound', lang)}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-[#6d8277]">{t('hoverHint', lang)}</p>
           </div>
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm font-medium text-[#305246]">
                 {t('tablesDetected', lang, { n: tables.length })}
               </span>
               {tables.length > 1 && (
                 <button
-                  className="text-xs bg-brand-50 text-brand-600 px-3 py-1 rounded-full hover:bg-brand-100 transition-colors font-medium"
+                  className="rounded-lg border border-brand-100 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50"
                   onClick={handleExportAll}
                 >
                   {t('exportAll', lang)}
@@ -280,12 +289,13 @@ function TableCard({ table, lang }: { table: TableInfo; lang: Lang }) {
   );
 
   return (
-    <div className="border border-gray-100 rounded-xl p-3 hover:border-brand-200 hover:bg-brand-50/30 transition-all group">
+    <div className="group rounded-xl border border-[#e5eadf] bg-white/85 p-3 shadow-soft transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-white hover:shadow-lift">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-gray-700 truncate max-w-[180px]">
-          {table.title}
+        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[#173127]">
+          <FileSpreadsheet className="h-4 w-4 shrink-0 text-brand-600" />
+          <span className="truncate max-w-[190px]">{table.title}</span>
         </span>
-        <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded">
+        <span className="rounded-md bg-cream-100 px-2 py-0.5 text-xs text-[#6d8277]">
           {table.rowCount}×{table.colCount}
         </span>
       </div>
@@ -293,12 +303,12 @@ function TableCard({ table, lang }: { table: TableInfo; lang: Lang }) {
       {table.headers.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {table.headers.slice(0, 4).map((h, i) => (
-            <span key={i} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+            <span key={i} className="rounded-md bg-brand-50 px-2 py-0.5 text-[10px] text-[#557064]">
               {h.length > 10 ? h.slice(0, 10) + '…' : h}
             </span>
           ))}
           {table.headers.length > 4 && (
-            <span className="text-[10px] text-gray-400">+{table.headers.length - 4}</span>
+            <span className="text-[10px] text-[#8a9a92]">+{table.headers.length - 4}</span>
           )}
         </div>
       )}
@@ -306,13 +316,13 @@ function TableCard({ table, lang }: { table: TableInfo; lang: Lang }) {
       <div className="flex gap-2">
         <button
           onClick={() => handleExport('xlsx')}
-          className="flex-1 text-xs bg-brand-600 text-white py-1.5 rounded-lg hover:bg-brand-700 transition-colors font-medium"
+          className="flex-1 rounded-lg bg-brand-600 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
         >
           {t('exportExcel', lang)}
         </button>
         <button
           onClick={() => handleExport('csv')}
-          className="text-xs border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+          className="rounded-lg border border-[#d9e7d8] px-3 py-1.5 text-xs text-[#557064] transition-colors hover:bg-brand-50 hover:text-brand-700"
         >
           {t('csvLabel', lang)}
         </button>

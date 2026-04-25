@@ -40,6 +40,7 @@ const zh = {
 
   // Settings panel
   language: '语言',
+  languageRegionHint: '默认根据浏览器地区自动显示语言，也可以在这里手动切换。',
   usageStats: '使用统计',
   creditsBalance: '积分余额',
   times: '次',
@@ -99,6 +100,7 @@ const en: Record<TranslationKey, string> = {
   openWebsite: 'Open SmartExcel website →',
 
   language: 'Language',
+  languageRegionHint: 'The panel follows your browser region by default. You can override it here.',
   usageStats: 'Usage Stats',
   creditsBalance: 'Credits',
   times: 'times',
@@ -144,22 +146,74 @@ export function t(
   return str.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`));
 }
 
+const CHINESE_REGION_CODES = new Set(['CN', 'HK', 'MO', 'SG', 'TW']);
+const CHINESE_TIME_ZONES = new Set([
+  'Asia/Shanghai',
+  'Asia/Chongqing',
+  'Asia/Harbin',
+  'Asia/Hong_Kong',
+  'Asia/Macau',
+  'Asia/Taipei',
+]);
+
+function getLocaleCandidates(): string[] {
+  const locales: string[] = [];
+
+  try {
+    if (typeof browser !== 'undefined') {
+      locales.push(browser.i18n.getUILanguage());
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const nav = globalThis.navigator;
+    if (nav.languages?.length) {
+      locales.push(...nav.languages);
+    }
+    if (nav.language) {
+      locales.push(nav.language);
+    }
+  } catch {
+    // ignore
+  }
+
+  return locales.filter(Boolean);
+}
+
+function localeLooksChinese(locale: string): boolean {
+  const normalized = locale.replace('_', '-');
+  const parts = normalized.split('-');
+  const language = parts[0]?.toLowerCase();
+  const region = parts.find((part) => part.length === 2)?.toUpperCase();
+
+  return language === 'zh' || Boolean(region && CHINESE_REGION_CODES.has(region));
+}
+
+function timeZoneLooksChinese(): boolean {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return CHINESE_TIME_ZONES.has(timeZone);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Detect the preferred language from the browser UI locale.
- * Falls back to 'en' for anything that isn't Chinese.
+ * Detect the preferred language from browser locale and regional hints.
+ * Falls back to English for regions that are not primarily Chinese-speaking.
  */
 export function detectBrowserLang(): Lang {
-  try {
-    const raw =
-      (typeof browser !== 'undefined'
-        ? browser.i18n.getUILanguage()
-        : navigator.language) || 'en';
-    return raw.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-  } catch {
-    try {
-      return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-    } catch {
-      return 'en';
-    }
+  const locales = getLocaleCandidates();
+
+  if (locales.some(localeLooksChinese)) {
+    return 'zh';
   }
+
+  if (timeZoneLooksChinese()) {
+    return 'zh';
+  }
+
+  return 'en';
 }

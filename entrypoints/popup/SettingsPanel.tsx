@@ -1,4 +1,5 @@
 import { t, LANG_LABELS, SUPPORTED_LANGS, type Lang } from '@/utils/i18n';
+import { ArrowLeft, Check, Globe2, LogIn, UserRound } from 'lucide-react';
 
 interface CreditState {
   credits: number;
@@ -29,47 +30,46 @@ export default function SettingsPanel({
   onLogout,
 }: SettingsPanelProps) {
   return (
-    <div className="w-[360px] min-h-[200px] bg-white">
+    <div className="w-[380px] min-h-[260px] overflow-hidden bg-cream-50 text-[#173127]">
       {/* Header */}
-      <div className="bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors"
-          title={t('back', lang)}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="white"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      <div className="border-b border-cream-200 bg-[radial-gradient(circle_at_top_left,rgba(42,179,127,0.18),transparent_36%),linear-gradient(135deg,#fffdf7_0%,#f1fbf6_100%)] px-4 py-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d9e7d8] bg-white/80 text-[#557064] shadow-sm transition-all hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+            title={t('back', lang)}
           >
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-        </button>
-        <h1 className="text-white font-semibold text-sm">{t('settings', lang)}</h1>
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-base font-semibold tracking-tight text-[#173127]">{t('settings', lang)}</h1>
+            <p className="mt-0.5 text-xs text-[#557064]">SmartExcel</p>
+          </div>
+        </div>
       </div>
 
       <div className="p-4 space-y-5">
         {/* Language section */}
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            {t('language', lang)}
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#557064]">
+            <Globe2 className="h-3.5 w-3.5 text-brand-600" />
+            <span>{t('language', lang)}</span>
           </p>
-          <div className="flex gap-2">
+          <p className="mb-2 text-xs leading-relaxed text-[#6d8277]">
+            {t('languageRegionHint', lang)}
+          </p>
+          <div className="grid grid-cols-2 gap-2">
             {SUPPORTED_LANGS.map((l) => (
               <button
                 key={l}
                 onClick={() => onLangChange(l)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 text-sm font-medium transition-colors ${
                   lang === l
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+                    : 'border-[#d9e7d8] bg-white/80 text-[#557064] hover:bg-brand-50 hover:text-brand-700'
                 }`}
               >
+                {lang === l && <Check className="h-3.5 w-3.5" />}
                 {LANG_LABELS[l]}
               </button>
             ))}
@@ -78,29 +78,30 @@ export default function SettingsPanel({
 
         {/* Usage stats section */}
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            {t('usageStats', lang)}
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#557064]">
+            <UserRound className="h-3.5 w-3.5 text-brand-600" />
+            <span>{t('usageStats', lang)}</span>
           </p>
-          <div className="bg-gray-50 rounded-xl p-3 space-y-2.5">
+          <div className="space-y-2.5 rounded-xl border border-[#e5eadf] bg-white/85 p-3 shadow-soft">
             {creditState ? (
               <>
                 {creditState.loggedIn ? (
                   <>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">{t('creditsBalance', lang)}</span>
-                      <span className="text-sm font-medium text-brand-600">
+                      <span className="text-sm text-[#557064]">{t('creditsBalance', lang)}</span>
+                      <span className="rounded-lg bg-brand-50 px-2 py-1 text-sm font-semibold text-brand-700">
                         {creditState.credits} {t('times', lang)}
                       </span>
                     </div>
                     <div className="space-y-2 pt-1">
-                      <div className="text-xs text-gray-400">
+                      <div className="break-all text-xs leading-relaxed text-[#6d8277]">
                         {t('loggedInAs', lang, {
                           email: creditState.email || creditState.name || '—',
                         })}
                       </div>
                       <button
                         onClick={onLogout}
-                        className="text-xs text-red-500 hover:underline"
+                        className="text-xs font-medium text-red-500 hover:underline"
                       >
                         {t('logout', lang)}
                       </button>
@@ -109,20 +110,21 @@ export default function SettingsPanel({
                 ) : (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">{t('loginRequiredToExport', lang)}</span>
+                      <span className="text-sm text-[#557064]">{t('loginRequiredToExport', lang)}</span>
                       <button
                         onClick={onLogin}
-                        className="text-xs text-brand-600 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
                       >
+                        <LogIn className="h-3 w-3" />
                         {t('login', lang)}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs leading-relaxed text-[#6d8277]">
                       {t('signupBonusHint', lang, { n: creditState.freeLimit })}
                     </p>
                     <button
                       onClick={onRegister}
-                      className="text-xs text-gray-500 hover:text-brand-600 hover:underline"
+                      className="text-xs font-medium text-brand-700 hover:underline"
                     >
                       {t('createAccountForBonus', lang, { n: creditState.freeLimit })}
                     </button>
@@ -130,7 +132,7 @@ export default function SettingsPanel({
                 )}
               </>
             ) : (
-              <p className="text-sm text-gray-400 text-center py-1">—</p>
+              <p className="text-sm text-[#8a9a92] text-center py-1">—</p>
             )}
           </div>
         </div>
