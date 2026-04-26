@@ -58,13 +58,16 @@ function buildBridgeUrl(options?: {
 }
 
 function buildPaymentRedirectPath(planId?: string) {
-  const url = new URL('/plugin-payment', SMARTEXCEL_URL);
-  url.searchParams.set('closeAfterPayment', 'true');
+  const url = new URL('/pricing', SMARTEXCEL_URL);
+  url.searchParams.set('source', 'extension');
+
   if (planId) {
     url.searchParams.set('planId', planId);
   }
 
-  return `${url.pathname}${url.search}`;
+  url.hash = 'credit-pack';
+
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function buildWebsiteRedirectPath(tableId?: string) {
@@ -687,7 +690,7 @@ export default defineBackground(() => {
       return true; // keep channel open for async response
     }
 
-    // Sync credits from plugin-payment page via postMessage relay
+    // Sync credits from website payment pages via postMessage relay
     if (message.type === 'PLUGIN_SYNC') {
       syncCredits(message.data).then(() => sendResponse({ ok: true }));
       return true;
