@@ -26,12 +26,17 @@ const zh = {
 
   // Tables list
   tablesDetected: '检测到 {n} 个表格',
+  selectedTables: '已选择 {n} 个',
+  selectAll: '全选',
+  deselectAll: '取消全选',
   exportAll: '全部导出',
+  exportSelected: '导出选中',
   confirmExportAll: '当前识别到 {count} 个表格，本次会消耗 {credits} 积分，确定继续吗？',
   insufficientCreditsForAll: '积分不足，本次导出需要 {credits} 积分。',
   clickToBuyCredits: '点击此处购买积分',
 
   // Table card
+  selectTable: '选择表格：{title}',
   exportExcel: '导出 Excel',
   csvLabel: 'CSV',
 
@@ -89,11 +94,16 @@ const en: Record<TranslationKey, string> = {
   hoverHint: 'Hover over a table to show the export button',
 
   tablesDetected: '{n} table(s) detected',
+  selectedTables: '{n} selected',
+  selectAll: 'Select all',
+  deselectAll: 'Deselect all',
   exportAll: 'Export All',
+  exportSelected: 'Export selected',
   confirmExportAll: '{count} tables detected. This export will cost {credits} credits. Continue?',
   insufficientCreditsForAll: 'Insufficient credits. This export requires {credits} credits.',
   clickToBuyCredits: 'Click here to buy credits',
 
+  selectTable: 'Select table: {title}',
   exportExcel: 'Export Excel',
   csvLabel: 'CSV',
 

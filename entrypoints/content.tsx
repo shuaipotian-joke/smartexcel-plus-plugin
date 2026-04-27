@@ -1,7 +1,13 @@
 import ReactDOM from 'react-dom/client';
 import TableOverlay from '@/components/TableOverlay';
 import { safeSendRuntimeMessage } from '@/utils/extension-runtime';
-import { detectTables, getLogicalTable, parseTable } from '@/utils/table-parser';
+import {
+  detectTables,
+  findClosestTableElement,
+  getLogicalTable,
+  parseTable,
+  type TableElement,
+} from '@/utils/table-parser';
 import {
   exportToExcel,
   exportMultipleTables,
@@ -23,7 +29,7 @@ type ExportAccessResult = CreditCheckResult & { openedFlow?: 'login' | 'payment'
 
 let toastHost: HTMLDivElement | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
-let lastContextTable: HTMLTableElement | null = null;
+let lastContextTable: TableElement | null = null;
 
 function showPageToast(message: string, duration = 2200) {
   if (!toastHost) {
@@ -87,9 +93,9 @@ async function ensureExportAccess(amount = 1): Promise<ExportAccessResult> {
 }
 
 function findTableById(
-  tables: HTMLTableElement[],
+  tables: TableElement[],
   tableId?: string
-): HTMLTableElement | undefined {
+): TableElement | undefined {
   if (!tableId) {
     return tables[0];
   }
@@ -98,9 +104,9 @@ function findTableById(
 }
 
 function resolveContextTable(
-  tables: HTMLTableElement[],
+  tables: TableElement[],
   tableId?: string
-): HTMLTableElement | undefined {
+): TableElement | undefined {
   if (lastContextTable && document.contains(lastContextTable)) {
     const contextTable = getLogicalTable(lastContextTable);
     const parsedContextId = parseTable(contextTable).id;
@@ -112,12 +118,12 @@ function resolveContextTable(
   return findTableById(tables, tableId);
 }
 
-function isHeaderContext(target: HTMLElement | null, table: HTMLTableElement | null): boolean {
+function isHeaderContext(target: HTMLElement | null, table: TableElement | null): boolean {
   if (!target || !table) {
     return false;
   }
 
-  if (target.closest('th')) {
+  if (target.closest('th, [role="columnheader"], [role="rowheader"]')) {
     return true;
   }
 
@@ -125,7 +131,7 @@ function isHeaderContext(target: HTMLElement | null, table: HTMLTableElement | n
     return true;
   }
 
-  return Boolean(target.closest('.el-table__header-wrapper'));
+  return Boolean(target.closest('.el-table__header-wrapper, .ag-header, .MuiDataGrid-columnHeaders, .rdg-header-row'));
 }
 
 export default defineContentScript({
@@ -169,7 +175,7 @@ export default defineContentScript({
     });
 
     const reportContextTarget = (target: HTMLElement | null) => {
-      const hoveredTable = target?.closest('table') as HTMLTableElement | null;
+      const hoveredTable = findClosestTableElement(target);
       const table = hoveredTable ? getLogicalTable(hoveredTable) : null;
       const headerContext = isHeaderContext(target, hoveredTable);
       lastContextTable = table;
@@ -243,7 +249,15 @@ export default defineContentScript({
 
         case 'EXPORT_ALL': {
           void (async () => {
-            const tableCount = tables.length;
+            const selectedIds = message.payload?.tableIds;
+            const exportTables = selectedIds
+              ? tables.filter((table) => selectedIds.includes(table.dataset.smartexcelTableId ?? ''))
+              : tables;
+            const tableCount = exportTables.length;
+            if (tableCount === 0) {
+              sendResponse({ ok: false, reason: 'table_not_found' });
+              return;
+            }
             const access = await ensureExportAccess(tableCount);
             if (!access.allowed) {
               sendResponse({
@@ -254,7 +268,7 @@ export default defineContentScript({
               return;
             }
 
-            const allParsed = tables.map((t) => parseTable(t));
+            const allParsed = exportTables.map((t) => parseTable(t));
             if (allParsed.length > 0) {
               exportMultipleTables(allParsed, document.title || 'tables-export');
             }

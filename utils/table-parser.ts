@@ -9,11 +9,12 @@ export interface ParsedTable {
     startCol: number;
     endCol: number;
   }>;
-  element: HTMLTableElement;
+  element: HTMLElement;
   rowCount: number;
   colCount: number;
   hasCssRowNumbers: boolean;
   cssRowNumbers: string[];
+  source: 'table' | 'div';
 }
 
 export interface LogicalTableBounds {
@@ -25,27 +26,37 @@ export interface LogicalTableBounds {
   height: number;
 }
 
-export function detectTables(): HTMLTableElement[] {
+export type TableElement = HTMLElement;
+
+export function detectTables(): TableElement[] {
   const meaningfulTables = Array.from(document.querySelectorAll('table'))
     .filter(isMeaningfulTable)
     .filter((table) => !isFixedReplicaTable(table))
     .filter((table) => !isSplitHeaderTable(table));
 
-  return meaningfulTables
-    .map((table, index) => {
-      if (!table.dataset.smartexcelTableId) {
-        table.dataset.smartexcelTableId = `table-${index + 1}`;
-      }
-      return table;
-    });
+  const divTables = detectDivTables();
+  const candidates = dedupeNestedCandidates([...meaningfulTables, ...divTables]);
+
+  return candidates.map((table, index) => {
+    if (!table.dataset.smartexcelTableId) {
+      table.dataset.smartexcelTableId = `table-${index + 1}`;
+    }
+    return table;
+  });
 }
 
-export function parseTable(table: HTMLTableElement): ParsedTable {
+export function parseTable(table: TableElement): ParsedTable {
   ensureStableTableId(table);
+
+  if (table.tagName.toLowerCase() !== 'table') {
+    return parseDivTable(table);
+  }
+
+  const htmlTable = table as HTMLTableElement;
   const rows: string[][] = [];
   const dataRowElements: Element[] = [];
-  const parsedGrid = buildParsedGrid(table);
-  const headers = resolveHeaders(table, parsedGrid);
+  const parsedGrid = buildParsedGrid(htmlTable);
+  const headers = resolveHeaders(htmlTable, parsedGrid);
   const merges = parsedGrid.merges;
   const colCount = Math.max(parsedGrid.colCount, headers.length);
 
@@ -62,41 +73,48 @@ export function parseTable(table: HTMLTableElement): ParsedTable {
     }
   });
 
-  const caption = table.querySelector('caption');
-  const ariaLabel = table.getAttribute('aria-label');
+  const caption = htmlTable.querySelector('caption');
+  const ariaLabel = htmlTable.getAttribute('aria-label');
   const title =
     caption?.textContent?.trim() ||
     ariaLabel ||
-    findNearbyHeading(table) ||
+    findNearbyHeading(htmlTable) ||
     sanitizeDocumentTitle(document.title) ||
-    `Table ${table.dataset.smartexcelTableId ?? 'unknown'}`;
+    `Table ${htmlTable.dataset.smartexcelTableId ?? 'unknown'}`;
 
-  const hasCssRowNumbers = detectCssRowNumbers(table);
+  const hasCssRowNumbers = detectCssRowNumbers(htmlTable);
   const cssRowNumbers = hasCssRowNumbers
     ? extractCssRowNumbers(dataRowElements)
     : [];
 
   return {
-    id: table.dataset.smartexcelTableId ?? 'table-unknown',
+    id: htmlTable.dataset.smartexcelTableId ?? 'table-unknown',
     title,
     headers,
     rows,
     merges,
-    element: table,
+    element: htmlTable,
     rowCount: rows.length,
     colCount,
     hasCssRowNumbers,
     cssRowNumbers,
+    source: 'table',
   };
 }
 
-export function getLogicalTable(table: HTMLTableElement): HTMLTableElement {
-  return findPrimaryTable(table) ?? findLinkedBodyTable(table) ?? table;
+export function getLogicalTable(table: TableElement): TableElement {
+  if (table.tagName.toLowerCase() !== 'table') {
+    return table;
+  }
+  const htmlTable = table as HTMLTableElement;
+  return findPrimaryTable(htmlTable) ?? findLinkedBodyTable(htmlTable) ?? htmlTable;
 }
 
-export function getLogicalTableBounds(table: HTMLTableElement): LogicalTableBounds {
+export function getLogicalTableBounds(table: TableElement): LogicalTableBounds {
   const logicalTable = getLogicalTable(table);
-  const headerTable = findLinkedHeaderTable(logicalTable, buildParsedGrid(logicalTable).colCount);
+  const headerTable = logicalTable.tagName.toLowerCase() === 'table'
+    ? findLinkedHeaderTable(logicalTable as HTMLTableElement, buildParsedGrid(logicalTable as HTMLTableElement).colCount)
+    : null;
 
   const rects = [logicalTable.getBoundingClientRect()];
   if (headerTable) {
@@ -116,6 +134,34 @@ export function getLogicalTableBounds(table: HTMLTableElement): LogicalTableBoun
     width: Math.max(0, right - left),
     height: Math.max(0, bottom - top),
   };
+}
+
+export function findClosestTableElement(target: HTMLElement | null): TableElement | null {
+  if (!target) {
+    return null;
+  }
+
+  const htmlTable = target.closest('table') as HTMLTableElement | null;
+  if (htmlTable) {
+    return htmlTable;
+  }
+
+  const selector = [
+    '[role="table"]',
+    '[role="grid"]',
+    '[role="treegrid"]',
+    '.ag-root',
+    '.ag-root-wrapper',
+    '.MuiDataGrid-root',
+    '.ReactVirtualized__Table',
+    '.ReactVirtualized__Grid',
+    '.rdg',
+    '.data-grid',
+    '.datatable',
+  ].join(',');
+
+  const candidate = target.closest(selector) as HTMLElement | null;
+  return candidate && isMeaningfulDivTable(candidate) ? candidate : null;
 }
 
 function buildParsedGrid(table: HTMLTableElement) {
@@ -381,17 +427,226 @@ function isMeaningfulTable(table: HTMLTableElement): boolean {
   return interactiveCount < Math.max(8, rows.length * 2);
 }
 
-function ensureStableTableId(table: HTMLTableElement): void {
+function detectDivTables(): HTMLElement[] {
+  const roleTables = Array.from(
+    document.querySelectorAll<HTMLElement>('[role="table"], [role="grid"], [role="treegrid"]')
+  ).filter(isMeaningfulDivTable);
+
+  const classTables = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '.ag-root, .ag-root-wrapper, .MuiDataGrid-root, .ReactVirtualized__Table, .ReactVirtualized__Grid, .rdg, .data-grid, .datatable'
+    )
+  ).filter(isMeaningfulDivTable);
+
+  return dedupeNestedCandidates([...roleTables, ...classTables]);
+}
+
+function dedupeNestedCandidates<T extends HTMLElement>(candidates: T[]): T[] {
+  const unique = Array.from(new Set(candidates));
+  return unique.filter((candidate) => {
+    return !unique.some((other) => {
+      if (other === candidate) {
+        return false;
+      }
+      if (!other.contains(candidate)) {
+        return false;
+      }
+
+      const candidateArea = getElementArea(candidate);
+      const otherArea = getElementArea(other);
+      return otherArea >= candidateArea * 0.85;
+    });
+  });
+}
+
+function parseDivTable(root: HTMLElement): ParsedTable {
+  const grid = buildDivGrid(root);
+  const headers = grid.headers;
+  const rows = grid.rows;
+  const ariaLabel = root.getAttribute('aria-label');
+  const title =
+    ariaLabel ||
+    findNearbyHeading(root) ||
+    sanitizeDocumentTitle(document.title) ||
+    `Table ${root.dataset.smartexcelTableId ?? 'unknown'}`;
+  const colCount = Math.max(headers.length, ...rows.map((row) => row.length), 0);
+
+  return {
+    id: root.dataset.smartexcelTableId ?? 'table-unknown',
+    title,
+    headers,
+    rows: rows.map((row) => normalizeRow(row, colCount)),
+    merges: [],
+    element: root,
+    rowCount: rows.length,
+    colCount,
+    hasCssRowNumbers: false,
+    cssRowNumbers: [],
+    source: 'div',
+  };
+}
+
+function buildDivGrid(root: HTMLElement): { headers: string[]; rows: string[][] } {
+  const roleRows = getRoleRows(root);
+  if (roleRows.length > 0) {
+    return parseRoleRows(roleRows);
+  }
+
+  if (root.matches('.ag-root, .ag-root-wrapper') || root.querySelector('.ag-row')) {
+    return parseClassRows(
+      root,
+      '.ag-header-row, .ag-row',
+      '.ag-header-cell, .ag-cell',
+      '.ag-header-cell-text'
+    );
+  }
+
+  if (root.matches('.MuiDataGrid-root') || root.querySelector('.MuiDataGrid-row')) {
+    return parseClassRows(
+      root,
+      '.MuiDataGrid-columnHeaders [role="row"], .MuiDataGrid-row',
+      '.MuiDataGrid-columnHeader, .MuiDataGrid-cell',
+      '.MuiDataGrid-columnHeaderTitle'
+    );
+  }
+
+  if (root.matches('.ReactVirtualized__Table, .ReactVirtualized__Grid') || root.querySelector('.ReactVirtualized__Table__row')) {
+    return parseClassRows(
+      root,
+      '.ReactVirtualized__Table__headerRow, .ReactVirtualized__Table__row',
+      '.ReactVirtualized__Table__headerColumn, .ReactVirtualized__Table__rowColumn'
+    );
+  }
+
+  if (root.matches('.rdg') || root.querySelector('.rdg-row')) {
+    return parseClassRows(root, '.rdg-header-row, .rdg-row', '.rdg-cell');
+  }
+
+  return parseVisualRows(root);
+}
+
+function getRoleRows(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>('[role="row"]'))
+    .filter((row) => isVisibleElement(row) && row.closest('[role="table"], [role="grid"], [role="treegrid"]') === root);
+}
+
+function parseRoleRows(rows: HTMLElement[]): { headers: string[]; rows: string[][] } {
+  const parsedRows = rows
+    .map((row) => {
+      const headerCells = Array.from(row.querySelectorAll<HTMLElement>('[role="columnheader"], [role="rowheader"]'));
+      const dataCells = Array.from(row.querySelectorAll<HTMLElement>('[role="gridcell"], [role="cell"]'));
+      const cells = headerCells.length > 0 ? headerCells : dataCells;
+      return {
+        isHeader: headerCells.length > 0,
+        cells: cells.map(getCellText).filter((cell) => cell !== ''),
+      };
+    })
+    .filter((row) => row.cells.length > 0);
+
+  const header = parsedRows.find((row) => row.isHeader)?.cells ?? [];
+  const bodyRows = parsedRows
+    .filter((row) => !row.isHeader)
+    .map((row) => row.cells);
+
+  return { headers: header, rows: bodyRows };
+}
+
+function parseClassRows(
+  root: HTMLElement,
+  rowSelector: string,
+  cellSelector: string,
+  headerTextSelector?: string
+): { headers: string[]; rows: string[][] } {
+  const rows = Array.from(root.querySelectorAll<HTMLElement>(rowSelector))
+    .filter(isVisibleElement)
+    .map((row) => {
+      const cells = Array.from(row.querySelectorAll<HTMLElement>(cellSelector))
+        .filter(isVisibleElement)
+        .map((cell) => headerTextSelector
+          ? getCellText(cell.querySelector(headerTextSelector) as HTMLElement | null ?? cell)
+          : getCellText(cell)
+        )
+        .filter((cell) => cell !== '');
+      const className = row.className.toString().toLowerCase();
+      const isHeader = className.includes('header') || row.getAttribute('role') === 'rowgroup';
+      return { isHeader, cells };
+    })
+    .filter((row) => row.cells.length > 0);
+
+  const headers = rows.find((row) => row.isHeader)?.cells ?? [];
+  const bodyRows = rows.filter((row) => !row.isHeader).map((row) => row.cells);
+  return { headers, rows: bodyRows };
+}
+
+function parseVisualRows(root: HTMLElement): { headers: string[]; rows: string[][] } {
+  const candidates = Array.from(root.querySelectorAll<HTMLElement>(':scope > *, :scope [class*="row"]'))
+    .filter((el) => isVisibleElement(el) && !el.querySelector('table'));
+  const rows = candidates
+    .map((row) => Array.from(row.children)
+      .filter((child): child is HTMLElement => child instanceof HTMLElement && isVisibleElement(child))
+      .map(getCellText)
+      .filter((cell) => cell !== '')
+    )
+    .filter((cells) => cells.length >= 2);
+
+  if (rows.length < 2) {
+    return { headers: [], rows: [] };
+  }
+
+  const firstLooksHeader = rows[0].every((cell) => Number.isNaN(Number(cell.replace(/,/g, ''))));
+  return firstLooksHeader
+    ? { headers: rows[0], rows: rows.slice(1) }
+    : { headers: [], rows };
+}
+
+function isMeaningfulDivTable(root: HTMLElement): boolean {
+  if (root.querySelector('table')) {
+    return false;
+  }
+
+  const rect = root.getBoundingClientRect();
+  if (rect.width < 120 || rect.height < 40) {
+    return false;
+  }
+
+  const grid = buildDivGrid(root);
+  const colCount = Math.max(grid.headers.length, ...grid.rows.map((row) => row.length), 0);
+  const nonEmptyRows = grid.rows.filter((row) => row.some((cell) => cell.trim() !== ''));
+
+  if (colCount < 2 || nonEmptyRows.length < 1) {
+    return false;
+  }
+
+  const joinedText = [...grid.headers, ...nonEmptyRows.flat()].join(' ').trim();
+  return joinedText.length > 0;
+}
+
+function normalizeRow(row: string[], colCount: number): string[] {
+  return Array.from({ length: colCount }, (_, index) => row[index] ?? '');
+}
+
+function getElementArea(el: HTMLElement): number {
+  const rect = el.getBoundingClientRect();
+  return Math.max(0, rect.width) * Math.max(0, rect.height);
+}
+
+function isVisibleElement(el: HTMLElement): boolean {
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+  return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+}
+
+function ensureStableTableId(table: HTMLElement): void {
   if (table.dataset.smartexcelTableId) {
     return;
   }
 
-  const allTables = Array.from(document.querySelectorAll('table'));
+  const allTables = detectTables();
   const index = allTables.indexOf(table);
   table.dataset.smartexcelTableId = `table-${index >= 0 ? index + 1 : 'unknown'}`;
 }
 
-function findNearbyHeading(table: HTMLTableElement): string {
+function findNearbyHeading(table: HTMLElement): string {
   const candidates = [
     table.closest('section')?.querySelector('h1, h2, h3, h4, h5, h6'),
     document.querySelector('.mw-page-title-main'),

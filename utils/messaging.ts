@@ -22,7 +22,7 @@ export type MessageType =
   | { type: 'SHOW_EXPORT_FEEDBACK'; payload: { format: 'xlsx' | 'csv'; remaining?: number; used?: number } }
   | { type: 'SHOW_EXPORT_PROGRESS'; payload?: { message?: string } }
   | { type: 'COPY_TABLE'; payload: { tableId: string } }
-  | { type: 'EXPORT_ALL'; payload?: never }
+  | { type: 'EXPORT_ALL'; payload?: { tableIds?: string[] } }
   | { type: 'SET_CONTEXT_TABLE'; payload: { tableId: string | null; isHeaderContext: boolean } }
   | { type: 'OPEN_WEBSITE'; payload: { tableId?: string } }
   | { type: 'OPEN_LOGIN'; payload?: never }

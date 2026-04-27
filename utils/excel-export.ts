@@ -76,7 +76,7 @@ export function copyTableToClipboard(
 
 function buildSheetData(table: ParsedTable, withIndex: boolean): string[][] {
   if (!withIndex) {
-    return [table.headers, ...table.rows];
+    return table.headers.length > 0 ? [table.headers, ...table.rows] : table.rows;
   }
 
   const useCssNumbers =
@@ -88,7 +88,7 @@ function buildSheetData(table: ParsedTable, withIndex: boolean): string[][] {
     return [num, ...row];
   });
 
-  return [headers, ...rows];
+  return table.headers.length > 0 ? [headers, ...rows] : rows;
 }
 
 function buildWorksheet(table: ParsedTable, withIndex: boolean): XLSX.WorkSheet {

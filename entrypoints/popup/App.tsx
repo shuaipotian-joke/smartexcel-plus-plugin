@@ -26,6 +26,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [creditState, setCreditState] = useState<CreditState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedTableIds, setSelectedTableIds] = useState<string[]>([]);
   const [actionMessage, setActionMessage] = useState<{
     text: string;
     showBuy: boolean;
@@ -71,10 +72,13 @@ export default function App() {
         }
 
         const result = await browser.tabs.sendMessage(tab.id, { type: 'GET_TABLES' });
-        setTables(result ?? []);
+        const nextTables = result ?? [];
+        setTables(nextTables);
+        setSelectedTableIds(nextTables.map((table: TableInfo) => table.id));
       }
     } catch {
       setTables([]);
+      setSelectedTableIds([]);
     } finally {
       setLoading(false);
     }
@@ -90,7 +94,11 @@ export default function App() {
   }
 
   const handleExportAll = useCallback(async () => {
-    if (tables.length === 0) {
+    const targetIds = selectedTableIds.length > 0
+      ? selectedTableIds
+      : tables.map((table) => table.id);
+
+    if (targetIds.length === 0) {
       return;
     }
 
@@ -101,10 +109,10 @@ export default function App() {
       return;
     }
 
-    const requiredCredits = tables.length;
+    const requiredCredits = targetIds.length;
     const confirmed = window.confirm(
       t('confirmExportAll', lang, {
-        count: tables.length,
+        count: targetIds.length,
         credits: requiredCredits,
       }),
     );
@@ -121,7 +129,10 @@ export default function App() {
         return;
       }
 
-      const result = await browser.tabs.sendMessage(tab.id, { type: 'EXPORT_ALL' });
+      const result = await browser.tabs.sendMessage(tab.id, {
+        type: 'EXPORT_ALL',
+        payload: { tableIds: targetIds },
+      });
       if (!result?.ok && result?.reason === 'no_credits') {
         setActionMessage({
           text: t('insufficientCreditsForAll', lang, {
@@ -131,7 +142,23 @@ export default function App() {
         });
       }
     }
-  }, [creditState?.loggedIn, lang, tables.length]);
+  }, [creditState?.loggedIn, lang, selectedTableIds, tables]);
+
+  const allSelected = tables.length > 0 && selectedTableIds.length === tables.length;
+
+  const handleToggleAll = useCallback(() => {
+    setSelectedTableIds((current) =>
+      current.length === tables.length ? [] : tables.map((table) => table.id),
+    );
+  }, [tables]);
+
+  const handleToggleTable = useCallback((tableId: string) => {
+    setSelectedTableIds((current) =>
+      current.includes(tableId)
+        ? current.filter((id) => id !== tableId)
+        : [...current, tableId],
+    );
+  }, []);
 
   const handleAddCredits = useCallback(() => {
     browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
@@ -247,20 +274,38 @@ export default function App() {
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-[#305246]">
-                {t('tablesDetected', lang, { n: tables.length })}
-              </span>
-              {tables.length > 1 && (
+              <div className="min-w-0">
+                <span className="block text-sm font-medium text-[#305246]">
+                  {t('tablesDetected', lang, { n: tables.length })}
+                </span>
+                <span className="block text-[11px] text-[#6d8277]">
+                  {t('selectedTables', lang, { n: selectedTableIds.length })}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
                 <button
-                  className="rounded-lg border border-brand-100 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50"
-                  onClick={handleExportAll}
+                  className="rounded-lg border border-brand-100 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                  onClick={handleToggleAll}
                 >
-                  {t('exportAll', lang)}
+                  {allSelected ? t('deselectAll', lang) : t('selectAll', lang)}
                 </button>
-              )}
+                <button
+                  className="rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-[#9db8ab]"
+                  onClick={handleExportAll}
+                  disabled={selectedTableIds.length === 0}
+                >
+                  {selectedTableIds.length === tables.length ? t('exportAll', lang) : t('exportSelected', lang)}
+                </button>
+              </div>
             </div>
             {tables.map((table) => (
-              <TableCard key={table.id} table={table} lang={lang} />
+              <TableCard
+                key={table.id}
+                table={table}
+                lang={lang}
+                selected={selectedTableIds.includes(table.id)}
+                onToggleSelected={() => handleToggleTable(table.id)}
+              />
             ))}
           </div>
         )}
@@ -269,7 +314,17 @@ export default function App() {
   );
 }
 
-function TableCard({ table, lang }: { table: TableInfo; lang: Lang }) {
+function TableCard({
+  table,
+  lang,
+  selected,
+  onToggleSelected,
+}: {
+  table: TableInfo;
+  lang: Lang;
+  selected: boolean;
+  onToggleSelected: () => void;
+}) {
   const handleExport = useCallback(
     async (format: 'xlsx' | 'csv') => {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -291,10 +346,17 @@ function TableCard({ table, lang }: { table: TableInfo; lang: Lang }) {
   return (
     <div className="group rounded-xl border border-[#e5eadf] bg-white/85 p-3 shadow-soft transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-white hover:shadow-lift">
       <div className="flex items-center justify-between mb-2">
-        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[#173127]">
+        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm font-medium text-[#173127]">
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-brand-600"
+            checked={selected}
+            onChange={onToggleSelected}
+            aria-label={t('selectTable', lang, { title: table.title })}
+          />
           <FileSpreadsheet className="h-4 w-4 shrink-0 text-brand-600" />
-          <span className="truncate max-w-[190px]">{table.title}</span>
-        </span>
+          <span className="truncate max-w-[170px]">{table.title}</span>
+        </label>
         <span className="rounded-md bg-cream-100 px-2 py-0.5 text-xs text-[#6d8277]">
           {table.rowCount}×{table.colCount}
         </span>

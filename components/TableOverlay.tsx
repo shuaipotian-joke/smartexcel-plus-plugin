@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import {
+  findClosestTableElement,
   getLogicalTable,
   getLogicalTableBounds,
   parseTable,
@@ -146,7 +147,7 @@ export default function TableOverlay() {
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      const hoveredTable = target.closest('table') as HTMLTableElement | null;
+      const hoveredTable = findClosestTableElement(target);
       if (!hoveredTable) return;
 
       const table = getLogicalTable(hoveredTable);
@@ -171,7 +172,7 @@ export default function TableOverlay() {
 
     const handleMouseOut = (e: MouseEvent) => {
       const related = e.relatedTarget as HTMLElement | null;
-      if (related?.closest('table')) return;
+      if (findClosestTableElement(related)) return;
       if (fabRef.current?.contains(related as Node)) return;
 
       hideTimer.current = setTimeout(() => {
