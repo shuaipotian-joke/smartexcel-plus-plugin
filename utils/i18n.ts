@@ -15,10 +15,12 @@ const zh = {
   back: '返回',
 
   // Credit bar
-  creditsRemaining: '剩余 {n} 次',
+  creditsRemaining: '永久免费',
   addCredits: '添加次数',
   login: '登录',
-  signupBonusHint: '登录后可用，新用户赠送 {n} 次导出',
+  signupBonusHint: '永久免费导出',
+  freeEditionEnabled: '免费版已启用，导出不再需要登录或次数。',
+  freeEditionDescription: '当前插件所有表格导出功能均可直接使用，无需登录、购买或同步积分。',
 
   // No tables state
   noTablesFound: '当前页面未检测到表格',
@@ -31,8 +33,8 @@ const zh = {
   deselectAll: '取消全选',
   exportAll: '全部导出',
   exportSelected: '导出选中',
-  confirmExportAll: '当前识别到 {count} 个表格，本次会消耗 {credits} 积分，确定继续吗？',
-  insufficientCreditsForAll: '积分不足，本次导出需要 {credits} 积分。',
+  confirmExportAll: '当前识别到 {count} 个表格，确定继续导出吗？',
+  insufficientCreditsForAll: '无法导出所选表格。',
   clickToBuyCredits: '点击此处购买积分',
 
   // Table card
@@ -47,6 +49,7 @@ const zh = {
   language: '语言',
   languageRegionHint: '默认根据浏览器地区自动显示语言，也可以在这里手动切换。',
   usageStats: '使用统计',
+  pluginMode: '插件模式',
   creditsBalance: '积分余额',
   times: '次',
   notLoggedIn: '未登录',
@@ -68,10 +71,10 @@ const zh = {
 
   // TableOverlay — toast messages
   exportedAs: '已导出为 {fmt}',
-  exportedWithCreditInfo: '已导出为 {fmt}，已扣除 {used} 积分，剩余 {n} 积分',
-  creditsLeft: '，剩余 {n} 积分',
+  exportedWithCreditInfo: '已导出为 {fmt}',
+  creditsLeft: '',
   exportingPleaseWait: '请稍等，正在导出…',
-  loginRequiredToExport: '导出前请先登录，新用户赠送 5 次',
+  loginRequiredToExport: '插件当前为免费版，无需登录即可导出',
   exportFailed: '导出失败，请重试',
   copiedToClipboard: '已复制到剪贴板',
   copyFailed: '复制失败，请重试',
@@ -85,10 +88,12 @@ const en: Record<TranslationKey, string> = {
   settings: 'Settings',
   back: 'Back',
 
-  creditsRemaining: '{n} credits left',
+  creditsRemaining: 'Free forever',
   addCredits: 'Add Credits',
   login: 'Login',
-  signupBonusHint: 'Sign in to export. New users get {n} free exports',
+  signupBonusHint: 'Unlimited free exports',
+  freeEditionEnabled: 'Free edition enabled. Exporting no longer requires sign-in or credits.',
+  freeEditionDescription: 'All table export features are now available directly with no login, purchase, or credit sync.',
 
   noTablesFound: 'No tables found on this page',
   hoverHint: 'Hover over a table to show the export button',
@@ -99,8 +104,8 @@ const en: Record<TranslationKey, string> = {
   deselectAll: 'Deselect all',
   exportAll: 'Export All',
   exportSelected: 'Export selected',
-  confirmExportAll: '{count} tables detected. This export will cost {credits} credits. Continue?',
-  insufficientCreditsForAll: 'Insufficient credits. This export requires {credits} credits.',
+  confirmExportAll: '{count} tables detected. Continue exporting?',
+  insufficientCreditsForAll: 'Unable to export the selected tables.',
   clickToBuyCredits: 'Click here to buy credits',
 
   selectTable: 'Select table: {title}',
@@ -112,6 +117,7 @@ const en: Record<TranslationKey, string> = {
   language: 'Language',
   languageRegionHint: 'The panel follows your browser region by default. You can override it here.',
   usageStats: 'Usage Stats',
+  pluginMode: 'Plugin Mode',
   creditsBalance: 'Credits',
   times: 'times',
   notLoggedIn: 'Not logged in',
@@ -131,10 +137,10 @@ const en: Record<TranslationKey, string> = {
   aiProcess: 'AI Processing',
 
   exportedAs: 'Exported as {fmt}',
-  exportedWithCreditInfo: 'Exported as {fmt}. {used} credit deducted, {n} credits left',
-  creditsLeft: ', {n} credits left',
+  exportedWithCreditInfo: 'Exported as {fmt}',
+  creditsLeft: '',
   exportingPleaseWait: 'Please wait, exporting...',
-  loginRequiredToExport: 'Please sign in before exporting. New users get 5 free exports',
+  loginRequiredToExport: 'This plugin is now free and exports without sign-in',
   exportFailed: 'Export failed, please retry',
   copiedToClipboard: 'Copied to clipboard',
   copyFailed: 'Copy failed, please retry',

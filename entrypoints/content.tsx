@@ -19,13 +19,10 @@ import '@/assets/styles/tailwind.css';
 
 type CreditCheckResult = {
   allowed: boolean;
-  remaining?: number;
   isLoggedIn: boolean;
   reason?: string;
   requiredCredits?: number;
 };
-
-type ExportAccessResult = CreditCheckResult & { openedFlow?: 'login' | 'payment' };
 
 let toastHost: HTMLDivElement | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -77,19 +74,8 @@ async function requestCheckAndConsume(amount = 1): Promise<CreditCheckResult> {
   return result ?? { allowed: false, reason: 'error', isLoggedIn: false };
 }
 
-async function ensureExportAccess(amount = 1): Promise<ExportAccessResult> {
-  const result = await requestCheckAndConsume(amount);
-  if (result.allowed) {
-    return result;
-  }
-
-  if (result.reason === 'not_logged_in') {
-    await safeSendRuntimeMessage({ type: 'OPEN_LOGIN' });
-    return { ...result, openedFlow: 'login' };
-  }
-
-  await safeSendRuntimeMessage({ type: 'OPEN_PAYMENT_PAGE' });
-  return { ...result, openedFlow: 'payment' };
+async function ensureExportAccess(amount = 1): Promise<CreditCheckResult> {
+  return requestCheckAndConsume(amount);
 }
 
 function findTableById(
@@ -345,12 +331,9 @@ export default defineContentScript({
         }
 
         case 'SHOW_EXPORT_FEEDBACK': {
-          const { format, remaining, used = 1 } = message.payload ?? {};
+          const { format } = message.payload ?? {};
           const fmt = (format ?? 'xlsx').toUpperCase();
-          const messageText =
-            remaining !== undefined
-              ? t('exportedWithCreditInfo', lang, { fmt, used, n: remaining })
-              : t('exportedAs', lang, { fmt });
+          const messageText = t('exportedAs', lang, { fmt });
           showPageToast(messageText);
           sendResponse({ ok: true });
           break;

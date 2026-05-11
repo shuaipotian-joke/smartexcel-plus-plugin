@@ -1,33 +1,16 @@
 import { t, LANG_LABELS, SUPPORTED_LANGS, type Lang } from '@/utils/i18n';
-import { ArrowLeft, Check, Globe2, LogIn, UserRound } from 'lucide-react';
-
-interface CreditState {
-  credits: number;
-  loggedIn: boolean;
-  freeUsed: number;
-  freeLimit: number;
-  email?: string;
-  name?: string;
-}
+import { ArrowLeft, Check, Globe2, Sparkles } from 'lucide-react';
 
 interface SettingsPanelProps {
   lang: Lang;
   onLangChange: (lang: Lang) => void;
   onBack: () => void;
-  creditState: CreditState | null;
-  onLogin: () => void;
-  onRegister: () => void;
-  onLogout: () => void;
 }
 
 export default function SettingsPanel({
   lang,
   onLangChange,
   onBack,
-  creditState,
-  onLogin,
-  onRegister,
-  onLogout,
 }: SettingsPanelProps) {
   return (
     <div className="w-[380px] min-h-[260px] overflow-hidden bg-cream-50 text-[#173127]">
@@ -79,61 +62,16 @@ export default function SettingsPanel({
         {/* Usage stats section */}
         <div>
           <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#557064]">
-            <UserRound className="h-3.5 w-3.5 text-brand-600" />
-            <span>{t('usageStats', lang)}</span>
+            <Sparkles className="h-3.5 w-3.5 text-brand-600" />
+            <span>{t('pluginMode', lang)}</span>
           </p>
           <div className="space-y-2.5 rounded-xl border border-[#e5eadf] bg-white/85 p-3 shadow-soft">
-            {creditState ? (
-              <>
-                {creditState.loggedIn ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[#557064]">{t('creditsBalance', lang)}</span>
-                      <span className="rounded-lg bg-brand-50 px-2 py-1 text-sm font-semibold text-brand-700">
-                        {creditState.credits} {t('times', lang)}
-                      </span>
-                    </div>
-                    <div className="space-y-2 pt-1">
-                      <div className="break-all text-xs leading-relaxed text-[#6d8277]">
-                        {t('loggedInAs', lang, {
-                          email: creditState.email || creditState.name || '—',
-                        })}
-                      </div>
-                      <button
-                        onClick={onLogout}
-                        className="text-xs font-medium text-red-500 hover:underline"
-                      >
-                        {t('logout', lang)}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[#557064]">{t('loginRequiredToExport', lang)}</span>
-                      <button
-                        onClick={onLogin}
-                        className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
-                      >
-                        <LogIn className="h-3 w-3" />
-                        {t('login', lang)}
-                      </button>
-                    </div>
-                    <p className="text-xs leading-relaxed text-[#6d8277]">
-                      {t('signupBonusHint', lang, { n: creditState.freeLimit })}
-                    </p>
-                    <button
-                      onClick={onRegister}
-                      className="text-xs font-medium text-brand-700 hover:underline"
-                    >
-                      {t('createAccountForBonus', lang, { n: creditState.freeLimit })}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-[#8a9a92] text-center py-1">—</p>
-            )}
+            <p className="text-sm font-medium text-[#305246]">
+              {t('freeEditionEnabled', lang)}
+            </p>
+            <p className="text-xs leading-relaxed text-[#6d8277]">
+              {t('freeEditionDescription', lang)}
+            </p>
           </div>
         </div>
       </div>

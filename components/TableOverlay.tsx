@@ -19,7 +19,6 @@ import { Check, ChevronDown, FileSpreadsheet, Table2 } from 'lucide-react';
 
 type CreditCheckResult = {
   allowed: boolean;
-  remaining?: number;
   isLoggedIn: boolean;
   reason?: string;
 };
@@ -29,14 +28,6 @@ async function requestCheckAndConsume(): Promise<CreditCheckResult> {
     type: 'CHECK_AND_CONSUME',
   });
   return result ?? { allowed: false, reason: 'error', isLoggedIn: false };
-}
-
-function openLoginPage() {
-  void safeSendRuntimeMessage({ type: 'OPEN_LOGIN' });
-}
-
-function openPaymentPage() {
-  void safeSendRuntimeMessage({ type: 'OPEN_PAYMENT_PAGE' });
 }
 
 interface FloatingButton {
@@ -211,27 +202,18 @@ export default function TableOverlay() {
       }
       setMenuOpen(false);
 
-      // 向后台请求积分检查并扣除
+      // Background still owns export access, but free mode always allows it.
       const result = await requestCheckAndConsume();
 
       if (!result.allowed) {
-        if (result.reason === 'not_logged_in') {
-          showToast(t('loginRequiredToExport', lang));
-          openLoginPage();
-          return;
-        }
-
-        openPaymentPage();
+        showToast(t('exportFailed', lang));
         return;
       }
 
       try {
         exportToExcel(fab.table, { format, withIndex: false });
         const fmt = format.toUpperCase();
-        const hint = result.remaining !== undefined
-          ? t('creditsLeft', lang, { n: result.remaining })
-          : '';
-        showToast(t('exportedAs', lang, { fmt }) + hint);
+        showToast(t('exportedAs', lang, { fmt }));
       } catch {
         showToast(t('exportFailed', lang));
       }

@@ -27,10 +27,6 @@ export default function App() {
   const [creditState, setCreditState] = useState<CreditState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedTableIds, setSelectedTableIds] = useState<string[]>([]);
-  const [actionMessage, setActionMessage] = useState<{
-    text: string;
-    showBuy: boolean;
-  } | null>(null);
 
   const lang = useExtensionStore((s) => s.lang);
   const setLang = useExtensionStore((s) => s.setLang);
@@ -50,8 +46,7 @@ export default function App() {
         changes.se_credits ||
         changes.se_logged_in ||
         changes.se_email ||
-        changes.se_name ||
-        changes.se_plugin_token
+        changes.se_name
       ) {
         void loadCreditState();
       }
@@ -102,18 +97,9 @@ export default function App() {
       return;
     }
 
-    setActionMessage(null);
-
-    if (!creditState?.loggedIn) {
-      await browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
-      return;
-    }
-
-    const requiredCredits = targetIds.length;
     const confirmed = window.confirm(
       t('confirmExportAll', lang, {
         count: targetIds.length,
-        credits: requiredCredits,
       }),
     );
 
@@ -133,16 +119,11 @@ export default function App() {
         type: 'EXPORT_ALL',
         payload: { tableIds: targetIds },
       });
-      if (!result?.ok && result?.reason === 'no_credits') {
-        setActionMessage({
-          text: t('insufficientCreditsForAll', lang, {
-            credits: result.requiredCredits ?? requiredCredits,
-          }),
-          showBuy: true,
-        });
+      if (!result?.ok) {
+        console.error('export all failed:', result?.reason);
       }
     }
-  }, [creditState?.loggedIn, lang, selectedTableIds, tables]);
+  }, [lang, selectedTableIds, tables]);
 
   const allSelected = tables.length > 0 && selectedTableIds.length === tables.length;
 
@@ -160,41 +141,12 @@ export default function App() {
     );
   }, []);
 
-  const handleAddCredits = useCallback(() => {
-    browser.runtime.sendMessage({ type: 'OPEN_PAYMENT_PAGE' });
-  }, []);
-
-  const handleLogin = useCallback(async () => {
-    await browser.runtime.sendMessage({ type: 'OPEN_LOGIN' });
-  }, []);
-
-  const handleRegister = useCallback(async () => {
-    await browser.runtime.sendMessage({ type: 'OPEN_REGISTER' });
-  }, []);
-
-  const handleLogout = useCallback(async () => {
-    await browser.runtime.sendMessage({ type: 'LOGOUT_PLUGIN' });
-    await loadCreditState();
-  }, []);
-
-  const getRemainingText = () => {
-    if (!creditState) return '';
-    if (creditState.loggedIn) {
-      return t('creditsRemaining', lang, { n: creditState.credits });
-    }
-    return t('signupBonusHint', lang, { n: creditState.freeLimit });
-  };
-
   if (showSettings) {
     return (
       <SettingsPanel
         lang={lang}
         onLangChange={setLang}
         onBack={() => setShowSettings(false)}
-        creditState={creditState}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
-        onLogout={handleLogout}
       />
     );
   }
@@ -223,39 +175,14 @@ export default function App() {
         </div>
       </div>
 
-      {/* Credit info bar */}
-      {creditState && (
-        <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-brand-100 bg-white/80 px-3 py-2.5 shadow-soft">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
-              <Sparkles className="h-3.5 w-3.5" />
-            </span>
-            <span className="truncate text-xs font-medium text-[#305246]">
-              {getRemainingText()}
-            </span>
-          </div>
-          <button
-            className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
-            onClick={creditState.loggedIn ? handleAddCredits : handleLogin}
-          >
-            {creditState.loggedIn ? t('addCredits', lang) : t('login', lang)}
-          </button>
-        </div>
-      )}
-
-      {actionMessage && (
-        <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm">
-          <span>{actionMessage.text}</span>{' '}
-          {actionMessage.showBuy && (
-            <button
-              className="font-medium underline underline-offset-2"
-              onClick={handleAddCredits}
-            >
-              {t('clickToBuyCredits', lang)}
-            </button>
-          )}
-        </div>
-      )}
+      <div className="mx-4 mt-4 flex items-center gap-2 rounded-xl border border-brand-100 bg-white/80 px-3 py-2.5 shadow-soft">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <span className="text-xs font-medium text-[#305246]">
+          {t('freeEditionEnabled', lang)}
+        </span>
+      </div>
 
       {/* Content */}
       <div className="p-4">
