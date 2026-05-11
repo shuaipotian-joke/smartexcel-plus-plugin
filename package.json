@@ -1,17 +1,17 @@
 {
-  "name": "smartexcel-plugin",
+  "name": "smartexcel-plus-plugin",
   "description": "Smart browser extension to detect and export HTML tables to Excel",
   "private": true,
   "version": "0.1.4",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shuaipotian-joke/smartexcel-plugin.git"
+    "url": "https://github.com/shuaipotian-joke/smartexcel-plus-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/shuaipotian-joke/smartexcel-plugin/issues"
+    "url": "https://github.com/shuaipotian-joke/smartexcel-plus-plugin/issues"
   },
-  "homepage": "https://github.com/shuaipotian-joke/smartexcel-plugin#readme",
+  "homepage": "https://github.com/shuaipotian-joke/smartexcel-plus-plugin#readme",
   "type": "module",
   "scripts": {
     "dev": "wxt",

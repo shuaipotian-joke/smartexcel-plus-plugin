@@ -1,6 +1,6 @@
 # SmartExcel Plugin Agent Guide
 
-This file is for the `smartexcel-plugin` browser extension repo only.
+This file is for the `smartexcel-plus-plugin` browser extension repo only.
 
 The plugin is tightly coupled to the sibling website repo `../smartexcel`. The extension is not only a local export tool; it also depends on the website for plugin login, payment, and credit sync. If a task changes extension credits, payment entry, login redirects, or sync behavior, assume the website repo may also need validation or code changes.
 

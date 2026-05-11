@@ -110,7 +110,7 @@ npm run zip:all
 ## Repository Layout
 
 ```text
-smartexcel-plugin/
+smartexcel-plus-plugin/
 ├── assets/styles/          # Tailwind entry styles
 ├── components/             # Shared React components
 ├── entrypoints/            # WXT background, content, and popup entrypoints
