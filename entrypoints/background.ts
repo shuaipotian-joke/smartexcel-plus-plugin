@@ -34,26 +34,9 @@ function buildWebsiteRedirectPath(tableId?: string) {
   return '/dashboard';
 }
 
-async function clearPluginSession() {
-  await browser.storage.local.remove([
-    'se_plugin_token',
-    'se_plugin_token_expires_at',
-    'se_logged_in',
-    'se_credits',
-    'se_email',
-    'se_name',
-    'se_user_id',
-  ]);
-}
-
 async function refreshPluginState() {
   return {
-    loggedIn: true,
-    credits: Infinity,
-    email: '',
-    name: '',
-    userId: '',
-    tokenExpiresAt: '',
+    isFree: true,
   };
 }
 
@@ -125,45 +108,6 @@ function updateContextMenuVisibility(state?: ContextMenuState) {
   void state;
 }
 
-/**
- * Free edition: always allow export without login or credit checks.
- */
-async function checkAndConsume(amount = 1): Promise<{
-  allowed: boolean;
-  remaining?: number;
-  isLoggedIn: boolean;
-  reason?: string;
-  requiredCredits?: number;
-}> {
-  void amount;
-  return { allowed: true, isLoggedIn: true };
-}
-
-async function syncCredits(data: {
-  credits: number;
-  loggedIn: boolean;
-  email?: string;
-  name?: string;
-}): Promise<void> {
-  await browser.storage.local.set({
-    se_credits: data.credits,
-    se_logged_in: data.loggedIn,
-    se_email: data.email ?? '',
-    se_name: data.name ?? '',
-  });
-}
-
-async function syncPluginAuth(data: {
-  token: string;
-  expiresAt: string;
-  credits: number;
-  userId: string;
-  email?: string;
-  name?: string;
-}): Promise<void> {
-  void data;
-}
-
 async function dispatchContextExport(
   tabId: number,
   tableId: string,
@@ -179,7 +123,7 @@ async function dispatchContextExport(
     tabId,
     {
       type: 'EXPORT_CONTEXT_TABLE',
-      payload: { tableId, format, skipAccessCheck: true },
+      payload: { tableId, format },
     },
     frameId != null ? { frameId } : undefined,
   );
@@ -275,14 +219,8 @@ async function continuePendingContextExport(
     pending.frameId,
   );
 
-  const access = await checkAndConsume(1);
-
-  if (!access.allowed) {
-    return undefined;
-  }
-
   await downloadPreparedContextExport(preparedFile);
-  return access.remaining;
+  return undefined;
 }
 
 // ─── Main background entry ─────────────────────────────────────────────────
@@ -325,62 +263,9 @@ export default defineBackground(() => {
       return true;
     }
 
-    if (message.type === 'OPEN_LOGIN') {
-      sendResponse({ ok: true });
-      return false;
-    }
-
-    if (message.type === 'OPEN_REGISTER') {
-      sendResponse({ ok: true });
-      return false;
-    }
-
-    if (message.type === 'OPEN_PAYMENT_PAGE') {
-      sendResponse({ ok: true });
-      return false;
-    }
-
-    // Check and consume one export credit (async)
-    if (message.type === 'CHECK_AND_CONSUME') {
-      checkAndConsume(message.payload?.amount).then(sendResponse);
-      return true; // keep channel open for async response
-    }
-
-    // Sync credits from website payment pages via postMessage relay
-    if (message.type === 'PLUGIN_SYNC') {
-      syncCredits(message.data).then(() => sendResponse({ ok: true }));
-      return true;
-    }
-
-    if (message.type === 'PLUGIN_AUTH_SYNC') {
-      syncPluginAuth(message.data).then(() => sendResponse({ ok: true }));
-      return true;
-    }
-
-    if (message.type === 'LOGOUT_PLUGIN') {
-      clearPluginSession()
-        .then(() => sendResponse({ ok: true }))
-        .catch((error) => {
-          console.error('logout plugin failed:', error);
-          sendResponse({ ok: false });
-        });
-      return true;
-    }
-
-    if (message.type === 'CLEAR_PLUGIN_SESSION') {
-      clearPluginSession()
-        .then(() => sendResponse({ ok: true }))
-        .catch((error) => {
-          console.error('clear plugin session failed:', error);
-          sendResponse({ ok: false });
-        });
-      return true;
-    }
-
-    // Get current credit state (for popup display)
     if (message.type === 'GET_STATE') {
-      refreshPluginState().then(async (state) => {
-        sendResponse({ ...state, freeUsed: 0, freeLimit: 0 });
+      refreshPluginState().then((state) => {
+        sendResponse(state);
       });
       return true;
     }

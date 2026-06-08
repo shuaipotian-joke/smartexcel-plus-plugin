@@ -2,7 +2,7 @@
 
 SmartExcel Plugin is an open-source browser extension that detects HTML tables on web pages and exports them to Excel-compatible files.
 
-It is designed as the browser-extension companion to the SmartExcel website. The extension can work as a table export tool, and it also integrates with the website for plugin login, credit balance, payment entry, and credit synchronization.
+It is designed as the browser-extension companion to the SmartExcel website. The extension now ships as a free export tool with no login, quota, or paid-credit requirement.
 
 ## What It Does
 
@@ -11,9 +11,7 @@ It is designed as the browser-extension companion to the SmartExcel website. The
 - Exports a single table as `.xlsx` or `.csv`.
 - Exports all detected tables from the popup.
 - Preserves table headers and structured cell data where possible.
-- Checks login, free quota, and credit balance before paid export flows.
-- Opens the SmartExcel website for login, registration, and credit purchase flows.
-- Syncs plugin authentication and credit state from the website.
+- Runs all export flows directly inside the extension with no sign-in or usage limit.
 - Displays the popup language from the user's browser region by default, with manual language switching in settings.
 
 ## Browser Support
@@ -30,10 +28,10 @@ It is designed as the browser-extension companion to the SmartExcel website. The
 
 | Path | Role |
 | --- | --- |
-| `entrypoints/background.ts` | Runtime coordinator for login state, credits, free limits, payment redirects, context-menu actions, and extension messages. |
+| `entrypoints/background.ts` | Runtime coordinator for export actions, popup communication, context-menu actions, and extension messages. |
 | `entrypoints/content.tsx` | Content script that runs on web pages, detects tables, handles page-level export actions, and mounts the floating table overlay. |
-| `entrypoints/popup/App.tsx` | Main popup panel that lists detected tables, displays account or credit state, and starts export/login/payment actions. |
-| `entrypoints/popup/SettingsPanel.tsx` | Popup settings screen for language, account state, login, registration, and logout controls. |
+| `entrypoints/popup/App.tsx` | Main popup panel that lists detected tables and starts export actions. |
+| `entrypoints/popup/SettingsPanel.tsx` | Popup settings screen for language and free-mode messaging. |
 | `components/TableOverlay.tsx` | Floating in-page SmartExcel button and export menu shown next to hovered tables. |
 | `utils/table-parser.ts` | HTML table detection and parsing logic. |
 | `utils/excel-export.ts` | SheetJS-based file generation for Excel and CSV exports. |
@@ -125,7 +123,7 @@ smartexcel-plus-plugin/
 
 Issues and pull requests are welcome. Please keep changes focused and run the relevant build command before opening a PR.
 
-For changes involving plugin credits, login redirects, payment entry, or website sync, validate the sibling SmartExcel website repo as well because those flows depend on both projects.
+If you reintroduce website-coupled login, payment, or sync flows in the future, validate the sibling SmartExcel website repo as well because those flows depend on both projects.
 
 ## License
 

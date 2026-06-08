@@ -17,13 +17,6 @@ import {
 import { t, detectBrowserLang } from '@/utils/i18n';
 import '@/assets/styles/tailwind.css';
 
-type CreditCheckResult = {
-  allowed: boolean;
-  isLoggedIn: boolean;
-  reason?: string;
-  requiredCredits?: number;
-};
-
 let toastHost: HTMLDivElement | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let lastContextTable: TableElement | null = null;
@@ -64,18 +57,6 @@ function showPageToast(message: string, duration = 2200) {
       }
     }, duration);
   }
-}
-
-async function requestCheckAndConsume(amount = 1): Promise<CreditCheckResult> {
-  const result = await safeSendRuntimeMessage<CreditCheckResult>({
-    type: 'CHECK_AND_CONSUME',
-    payload: { amount },
-  });
-  return result ?? { allowed: false, reason: 'error', isLoggedIn: false };
-}
-
-async function ensureExportAccess(amount = 1): Promise<CreditCheckResult> {
-  return requestCheckAndConsume(amount);
 }
 
 function findTableById(
@@ -145,21 +126,6 @@ export default defineContentScript({
 
     ui.mount();
 
-    // Relay postMessage from smartexcel.app pages (e.g. plugin-payment after payment success)
-    window.addEventListener('message', (e: MessageEvent) => {
-      if (e.data?.type === 'SE_PLUGIN_AUTH' && e.data?.data) {
-        void safeSendRuntimeMessage({ type: 'PLUGIN_AUTH_SYNC', data: e.data.data });
-      }
-
-      if (e.data?.type === 'SE_PLUGIN_SYNC' && e.data?.data) {
-        void safeSendRuntimeMessage({ type: 'PLUGIN_SYNC', data: e.data.data });
-      }
-
-      if (e.data?.type === 'SE_PLUGIN_LOGOUT') {
-        void safeSendRuntimeMessage({ type: 'CLEAR_PLUGIN_SESSION' });
-      }
-    });
-
     const reportContextTarget = (target: HTMLElement | null) => {
       const hoveredTable = findClosestTableElement(target);
       const table = hoveredTable ? getLogicalTable(hoveredTable) : null;
@@ -217,12 +183,6 @@ export default defineContentScript({
 
         case 'EXPORT_TABLE': {
           void (async () => {
-            const access = await ensureExportAccess(1);
-            if (!access.allowed) {
-              sendResponse({ ok: false, reason: access.reason });
-              return;
-            }
-
             const { format } = message.payload;
             const table = findTableById(tables, message.payload?.tableId);
             if (table) {
@@ -244,15 +204,6 @@ export default defineContentScript({
               sendResponse({ ok: false, reason: 'table_not_found' });
               return;
             }
-            const access = await ensureExportAccess(tableCount);
-            if (!access.allowed) {
-              sendResponse({
-                ok: false,
-                reason: access.reason,
-                requiredCredits: access.requiredCredits ?? tableCount,
-              });
-              return;
-            }
 
             const allParsed = exportTables.map((t) => parseTable(t));
             if (allParsed.length > 0) {
@@ -265,12 +216,6 @@ export default defineContentScript({
 
         case 'COPY_TABLE': {
           void (async () => {
-            const access = await ensureExportAccess(1);
-            if (!access.allowed) {
-              sendResponse({ ok: false, reason: access.reason });
-              return;
-            }
-
             const target = findTableById(tables, message.payload?.tableId);
             if (target) {
               await copyTableToClipboard(parseTable(target));
@@ -282,14 +227,7 @@ export default defineContentScript({
 
         case 'EXPORT_CONTEXT_TABLE': {
           void (async () => {
-            const { format, tableId, skipAccessCheck } = message.payload ?? {};
-            if (!skipAccessCheck) {
-              const access = await ensureExportAccess(1);
-              if (!access.allowed) {
-                sendResponse({ ok: false, reason: access.reason });
-                return;
-              }
-            }
+            const { format, tableId } = message.payload ?? {};
 
             const table = resolveContextTable(tables, tableId);
             if (!table) {

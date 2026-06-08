@@ -10,25 +10,11 @@ import {
 import {
   isExtensionContextValid,
   safeAddStorageChangedListener,
-  safeSendRuntimeMessage,
 } from '@/utils/extension-runtime';
 import { exportToExcel } from '@/utils/excel-export';
 import { useExtensionStore } from '@/utils/store';
 import { t, type Lang } from '@/utils/i18n';
 import { Check, ChevronDown, FileSpreadsheet, Table2 } from 'lucide-react';
-
-type CreditCheckResult = {
-  allowed: boolean;
-  isLoggedIn: boolean;
-  reason?: string;
-};
-
-async function requestCheckAndConsume(): Promise<CreditCheckResult> {
-  const result = await safeSendRuntimeMessage<CreditCheckResult>({
-    type: 'CHECK_AND_CONSUME',
-  });
-  return result ?? { allowed: false, reason: 'error', isLoggedIn: false };
-}
 
 interface FloatingButton {
   visible: boolean;
@@ -201,14 +187,6 @@ export default function TableOverlay() {
         return;
       }
       setMenuOpen(false);
-
-      // Background still owns export access, but free mode always allows it.
-      const result = await requestCheckAndConsume();
-
-      if (!result.allowed) {
-        showToast(t('exportFailed', lang));
-        return;
-      }
 
       try {
         exportToExcel(fab.table, { format, withIndex: false });

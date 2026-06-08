@@ -16,9 +16,6 @@ const zh = {
 
   // Credit bar
   creditsRemaining: '永久免费',
-  addCredits: '添加次数',
-  login: '登录',
-  signupBonusHint: '永久免费导出',
   freeEditionEnabled: '免费版已启用，导出不再需要登录或次数。',
   freeEditionDescription: '当前插件所有表格导出功能均可直接使用，无需登录、购买或同步积分。',
 
@@ -34,8 +31,6 @@ const zh = {
   exportAll: '全部导出',
   exportSelected: '导出选中',
   confirmExportAll: '当前识别到 {count} 个表格，确定继续导出吗？',
-  insufficientCreditsForAll: '无法导出所选表格。',
-  clickToBuyCredits: '点击此处购买积分',
 
   // Table card
   selectTable: '选择表格：{title}',
@@ -48,15 +43,7 @@ const zh = {
   // Settings panel
   language: '语言',
   languageRegionHint: '默认根据浏览器地区自动显示语言，也可以在这里手动切换。',
-  usageStats: '使用统计',
   pluginMode: '插件模式',
-  creditsBalance: '积分余额',
-  times: '次',
-  notLoggedIn: '未登录',
-  createAccount: '注册新账号',
-  createAccountForBonus: '注册领取 {n} 次导出',
-  loggedInAs: '当前账号：{email}',
-  logout: '退出登录',
 
   // TableOverlay — button / menu labels
   exportTableTitle: 'SmartExcel - 导出表格',
@@ -71,10 +58,7 @@ const zh = {
 
   // TableOverlay — toast messages
   exportedAs: '已导出为 {fmt}',
-  exportedWithCreditInfo: '已导出为 {fmt}',
-  creditsLeft: '',
   exportingPleaseWait: '请稍等，正在导出…',
-  loginRequiredToExport: '插件当前为免费版，无需登录即可导出',
   exportFailed: '导出失败，请重试',
   copiedToClipboard: '已复制到剪贴板',
   copyFailed: '复制失败，请重试',
@@ -89,9 +73,6 @@ const en: Record<TranslationKey, string> = {
   back: 'Back',
 
   creditsRemaining: 'Free forever',
-  addCredits: 'Add Credits',
-  login: 'Login',
-  signupBonusHint: 'Unlimited free exports',
   freeEditionEnabled: 'Free edition enabled. Exporting no longer requires sign-in or credits.',
   freeEditionDescription: 'All table export features are now available directly with no login, purchase, or credit sync.',
 
@@ -105,8 +86,6 @@ const en: Record<TranslationKey, string> = {
   exportAll: 'Export All',
   exportSelected: 'Export selected',
   confirmExportAll: '{count} tables detected. Continue exporting?',
-  insufficientCreditsForAll: 'Unable to export the selected tables.',
-  clickToBuyCredits: 'Click here to buy credits',
 
   selectTable: 'Select table: {title}',
   exportExcel: 'Export Excel',
@@ -116,15 +95,7 @@ const en: Record<TranslationKey, string> = {
 
   language: 'Language',
   languageRegionHint: 'The panel follows your browser region by default. You can override it here.',
-  usageStats: 'Usage Stats',
   pluginMode: 'Plugin Mode',
-  creditsBalance: 'Credits',
-  times: 'times',
-  notLoggedIn: 'Not logged in',
-  createAccount: 'Create account',
-  createAccountForBonus: 'Create account and get {n} exports',
-  loggedInAs: 'Signed in as: {email}',
-  logout: 'Log out',
 
   exportTableTitle: 'SmartExcel - Export Table',
   rowsCols: '{r} rows × {c} cols',
@@ -137,10 +108,7 @@ const en: Record<TranslationKey, string> = {
   aiProcess: 'AI Processing',
 
   exportedAs: 'Exported as {fmt}',
-  exportedWithCreditInfo: 'Exported as {fmt}',
-  creditsLeft: '',
   exportingPleaseWait: 'Please wait, exporting...',
-  loginRequiredToExport: 'This plugin is now free and exports without sign-in',
   exportFailed: 'Export failed, please retry',
   copiedToClipboard: 'Copied to clipboard',
   copyFailed: 'Copy failed, please retry',

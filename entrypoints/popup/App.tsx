@@ -12,19 +12,9 @@ import {
 } from 'lucide-react';
 import SettingsPanel from './SettingsPanel';
 
-type CreditState = {
-  credits: number;
-  loggedIn: boolean;
-  freeUsed: number;
-  freeLimit: number;
-  email?: string;
-  name?: string;
-};
-
 export default function App() {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creditState, setCreditState] = useState<CreditState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedTableIds, setSelectedTableIds] = useState<string[]>([]);
 
@@ -35,26 +25,7 @@ export default function App() {
   useEffect(() => {
     initLang();
     loadTables();
-    loadCreditState();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const handleStorageChange = (
-      changes: Record<string, { newValue?: unknown }>
-    ) => {
-      if (
-        changes.se_credits ||
-        changes.se_logged_in ||
-        changes.se_email ||
-        changes.se_name
-      ) {
-        void loadCreditState();
-      }
-    };
-
-    browser.storage.onChanged.addListener(handleStorageChange);
-    return () => browser.storage.onChanged.removeListener(handleStorageChange);
-  }, []);
 
   async function loadTables() {
     try {
@@ -76,15 +47,6 @@ export default function App() {
       setSelectedTableIds([]);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadCreditState() {
-    try {
-      const state = await browser.runtime.sendMessage({ type: 'GET_STATE' });
-      setCreditState(state);
-    } catch {
-      // ignore
     }
   }
 
